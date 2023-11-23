@@ -9,6 +9,43 @@ extern bool audit_bindings_before_draw;
 StaticMesh::StaticMesh(const MeshData& data) :
     _vertex_buffer(data.vertices),
     _index_buffer(data.indices) {
+
+
+    // Create a bounding sphere
+
+    // Search the center of the sphere
+    glm::vec3 maxCorner = data.vertices[0].position;
+    glm::vec3 minCorner = data.vertices[0].position;
+
+    for (int i = 1; i < data.vertices.size(); ++i)
+    {
+        glm::vec3 vertex_pos = data.vertices[i].position;
+        if (vertex_pos.x > maxCorner.x)
+            maxCorner.x = vertex_pos.x;
+        else if (vertex_pos.x < maxCorner.x)
+            minCorner.x = vertex_pos.x;
+
+        if (vertex_pos.y > maxCorner.y)
+            maxCorner.y = vertex_pos.y;
+        else if (vertex_pos.y < maxCorner.y)
+            minCorner.y = vertex_pos.y;
+
+        if (vertex_pos.z > maxCorner.z)
+            maxCorner.z = vertex_pos.z;
+        else if (vertex_pos.z < maxCorner.z)
+            minCorner.z = vertex_pos.z;
+    }
+
+    glm::vec3 center = (maxCorner + minCorner) / 2.0f;
+    float radius = std::max({abs(maxCorner.x - center.x), abs(maxCorner.y - center.y), abs(maxCorner.z - center.z)});
+
+    _bbox.center = center;
+    _bbox.radius = radius;
+
+}
+
+bool frustumTest() {
+    return true;
 }
 
 void StaticMesh::draw() const {
@@ -36,7 +73,9 @@ void StaticMesh::draw() const {
         audit_bindings();
     }
 
-    glDrawElements(GL_TRIANGLES, int(_index_buffer.element_count()), GL_UNSIGNED_INT, nullptr);
+    // Test the bounding box with the frustum before drawing
+    if (frustumTest())
+        glDrawElements(GL_TRIANGLES, int(_index_buffer.element_count()), GL_UNSIGNED_INT, nullptr);
 }
 
 }
