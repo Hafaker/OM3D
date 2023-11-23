@@ -17,6 +17,10 @@ void Material::set_blend_mode(BlendMode blend) {
     _blend_mode = blend;
 }
 
+void Material::set_cull_mode(CullMode cull) {
+    _cull_mode = cull;
+}
+
 void Material::set_depth_test_mode(DepthTestMode depth) {
     _depth_test_mode = depth;
 }
@@ -40,6 +44,18 @@ void Material::bind() const {
             glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
         break;
     }
+
+    switch (_cull_mode) {
+        case CullMode::None:
+            glDisable(GL_CULL_FACE);
+            break;
+
+        case CullMode::Back:
+            glEnable(GL_CULL_FACE);
+            glCullFace(GL_BACK);
+            glFrontFace(GL_CCW);
+            break;
+}
 
     switch(_depth_test_mode) {
         case DepthTestMode::None:

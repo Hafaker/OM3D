@@ -14,6 +14,11 @@ enum class BlendMode {
     Alpha,
 };
 
+enum class CullMode {
+    None,
+    Back,
+};
+
 enum class DepthTestMode {
     Standard,
     Reversed,
@@ -28,6 +33,7 @@ class Material {
 
         void set_program(std::shared_ptr<Program> prog);
         void set_blend_mode(BlendMode blend);
+        void set_cull_mode(CullMode cull);
         void set_depth_test_mode(DepthTestMode depth);
         void set_texture(u32 slot, std::shared_ptr<Texture> tex);
 
@@ -49,6 +55,7 @@ class Material {
         std::vector<std::pair<u32, std::shared_ptr<Texture>>> _textures;
 
         BlendMode _blend_mode = BlendMode::None;
+        CullMode _cull_mode = CullMode::None;
         DepthTestMode _depth_test_mode = DepthTestMode::Standard;
 
 };

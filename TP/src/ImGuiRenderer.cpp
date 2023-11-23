@@ -188,6 +188,7 @@ ImGuiRenderer::ImGuiRenderer(GLFWwindow* window) : _window(window) {
 
     _material.set_program(Program::from_files("imgui.frag", "imgui.vert"));
     _material.set_depth_test_mode(DepthTestMode::None);
+    _material.set_cull_mode(CullMode::Back);
     _material.set_blend_mode(BlendMode::Alpha);
 
     _font = create_font();
