@@ -14,6 +14,7 @@ struct Frustum {
     glm::vec3 _bottom_normal;
     glm::vec3 _right_normal;
     glm::vec3 _left_normal;
+    glm::vec3 _point;
 };
 
 
