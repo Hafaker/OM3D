@@ -9,14 +9,28 @@ SceneObject::SceneObject(std::shared_ptr<StaticMesh> mesh, std::shared_ptr<Mater
     _material(std::move(material)) {
 }
 
-void SceneObject::render() const {
+bool testPlane(std::shared_ptr<StaticMesh> mesh, glm::vec3& plane_normal)
+{
+    SphereBoundingBox bbox = mesh->_bbox;
+    return glm::dot(plane_normal, bbox.center) + bbox.radius > 0;
+}
+
+void SceneObject::render(Frustum frustum) const {
     if(!_material || !_mesh) {
         return;
     }
 
     _material->set_uniform(HASH("model"), transform());
     _material->bind();
-    _mesh->draw();
+
+    if (testPlane(_mesh, frustum._near_normal) &&
+        testPlane(_mesh, frustum._top_normal) &&
+        testPlane(_mesh, frustum._bottom_normal) &&
+        testPlane(_mesh, frustum._right_normal) &&
+        testPlane(_mesh, frustum._left_normal)) {
+        _mesh->draw();
+    }
+    
 }
 
 void SceneObject::set_transform(const glm::mat4& tr) {

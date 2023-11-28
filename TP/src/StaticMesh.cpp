@@ -1,4 +1,5 @@
 #include "StaticMesh.h"
+#include "Camera.h"
 
 #include <glad/glad.h>
 
@@ -22,17 +23,17 @@ StaticMesh::StaticMesh(const MeshData& data) :
         glm::vec3 vertex_pos = data.vertices[i].position;
         if (vertex_pos.x > maxCorner.x)
             maxCorner.x = vertex_pos.x;
-        else if (vertex_pos.x < maxCorner.x)
+        else if (vertex_pos.x < minCorner.x)
             minCorner.x = vertex_pos.x;
 
         if (vertex_pos.y > maxCorner.y)
             maxCorner.y = vertex_pos.y;
-        else if (vertex_pos.y < maxCorner.y)
+        else if (vertex_pos.y < minCorner.y)
             minCorner.y = vertex_pos.y;
 
         if (vertex_pos.z > maxCorner.z)
             maxCorner.z = vertex_pos.z;
-        else if (vertex_pos.z < maxCorner.z)
+        else if (vertex_pos.z < minCorner.z)
             minCorner.z = vertex_pos.z;
     }
 
@@ -42,10 +43,6 @@ StaticMesh::StaticMesh(const MeshData& data) :
     _bbox.center = center;
     _bbox.radius = radius;
 
-}
-
-bool frustumTest() {
-    return true;
 }
 
 void StaticMesh::draw() const {
@@ -74,8 +71,7 @@ void StaticMesh::draw() const {
     }
 
     // Test the bounding box with the frustum before drawing
-    if (frustumTest())
-        glDrawElements(GL_TRIANGLES, int(_index_buffer.element_count()), GL_UNSIGNED_INT, nullptr);
+    glDrawElements(GL_TRIANGLES, int(_index_buffer.element_count()), GL_UNSIGNED_INT, nullptr);
 }
 
 }
