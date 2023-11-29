@@ -37,7 +37,6 @@ class Scene : NonMovable {
         glm::vec3 _sun_direction = glm::vec3(0.2f, 1.0f, 0.1f);
         glm::vec3 _sun_color = glm::vec3(1.0f);
 
-
         Camera _camera;
 };
 

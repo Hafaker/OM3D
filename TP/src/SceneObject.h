@@ -4,6 +4,8 @@
 #include <StaticMesh.h>
 #include <Material.h>
 
+#include "Camera.h"
+
 #include <memory>
 
 #include <glm/matrix.hpp>
@@ -15,7 +17,7 @@ class SceneObject {
     public:
         SceneObject(std::shared_ptr<StaticMesh> mesh = nullptr, std::shared_ptr<Material> material = nullptr);
 
-        void render() const;
+        void render(Frustum frustum) const;
 
         void set_transform(const glm::mat4& tr);
         const glm::mat4& transform() const;

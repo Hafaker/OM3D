@@ -14,6 +14,11 @@ struct MeshData {
     std::vector<u32> indices;
 };
 
+struct SphereBoundingBox {
+    glm::vec3 center;
+    float radius; 
+};
+
 class StaticMesh : NonCopyable {
 
     public:
@@ -23,7 +28,13 @@ class StaticMesh : NonCopyable {
 
         StaticMesh(const MeshData& data);
 
+        float getSignedDistanceToPlane(glm::vec3& plane, const glm::vec3& point) const;
+        bool isOnOrForwardPlane(glm::vec3& plane) const;
+        bool frustumTest();
+
         void draw() const;
+
+        SphereBoundingBox _bbox;
 
     private:
         TypedBuffer<Vertex> _vertex_buffer;
