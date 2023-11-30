@@ -235,8 +235,13 @@ struct RendererState {
             state.depth_texture = Texture(size, ImageFormat::Depth32_FLOAT);
             state.lit_hdr_texture = Texture(size, ImageFormat::RGBA16_FLOAT);
             state.tone_mapped_texture = Texture(size, ImageFormat::RGBA8_UNORM);
+            
+            state.albedo_texture = Texture(size, ImageFormat::RGB8_sRGB);
+            state.normals_texture = Texture(size, ImageFormat::RGBA8_UNORM);
+
             state.main_framebuffer = Framebuffer(&state.depth_texture, std::array{&state.lit_hdr_texture});
             state.tone_map_framebuffer = Framebuffer(nullptr, std::array{&state.tone_mapped_texture});
+            state.g_buffer_framebuffer = Framebuffer(&state.depth_texture, std::array{&state.albedo_texture, &state.normals_texture});
         }
 
         return state;
@@ -248,8 +253,12 @@ struct RendererState {
     Texture lit_hdr_texture;
     Texture tone_mapped_texture;
 
+    Texture albedo_texture;
+    Texture normals_texture;
+
     Framebuffer main_framebuffer;
     Framebuffer tone_map_framebuffer;
+    Framebuffer g_buffer_framebuffer;
 };
 
 
@@ -282,6 +291,7 @@ int main(int argc, char** argv) {
     scene = create_default_scene();
 
     auto tonemap_program = Program::from_files("tonemap.frag", "screen.vert");
+    auto gbuffer_program = Program::from_files("g-buffer.frag", "basic.vert");
     RendererState renderer;
 
     for(;;) {
@@ -310,7 +320,7 @@ int main(int argc, char** argv) {
         // Render the scene
         {
             renderer.main_framebuffer.bind();
-            scene->render();
+            //scene->render();
         }
 
         // Apply a tonemap in compute shader
@@ -322,9 +332,19 @@ int main(int argc, char** argv) {
             glDrawArrays(GL_TRIANGLES, 0, 3);
         }
 
+        {
+            renderer.g_buffer_framebuffer.bind();
+            scene->render();
+
+            gbuffer_program->bind();
+
+            glDrawArrays(GL_TRIANGLES, 0, 3);
+        }
+
         // Blit tonemap result to screen
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
-        renderer.tone_map_framebuffer.blit();
+        renderer.g_buffer_framebuffer.blit();
+        
 
         gui(imgui);
 
