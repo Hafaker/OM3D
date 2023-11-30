@@ -8,6 +8,6 @@ layout(location = 1) out vec4 out_normals;
 
 void main()
 {
-    out_albedo = vec4(in_color, 0.0f);
-    out_normals = vec4(in_normal, 0.0f);
+    out_albedo = vec4(in_color, 1.0f);
+    out_normals = vec4(in_normal, 1.0f);
 }
