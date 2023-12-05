@@ -30,12 +30,12 @@ void SceneObject::render(Frustum frustum) const {
     _material->set_uniform(HASH("model"), transform());
     _material->bind();
 
-    if (testPlane(_mesh, frustum._near_normal, frustum._point) &&
+    /*if (testPlane(_mesh, frustum._near_normal, frustum._point) &&
         testPlane(_mesh, frustum._top_normal, frustum._point) &&
         testPlane(_mesh, frustum._bottom_normal, frustum._point) &&
         testPlane(_mesh, frustum._right_normal, frustum._point) &&
         testPlane(_mesh, frustum._left_normal, frustum._point)
-        ) {
+        )*/ {
         _mesh->draw();
     }
     
