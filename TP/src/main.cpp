@@ -261,7 +261,7 @@ struct RendererState {
             state.main_framebuffer = Framebuffer(&state.depth_texture, std::array{&state.lit_hdr_texture});
             //state.tone_map_framebuffer = Framebuffer(nullptr, std::array{&state.tone_mapped_texture});
             state.g_framebuffer = Framebuffer(&state.depth_texture, std::array{&state.albedo_texture, &state.normals_texture});
-            state.display_debug = Framebuffer(&state.depth_texture, std::array{&state.tone_mapped_texture});
+            state.display_debug = Framebuffer(nullptr, std::array{&state.tone_mapped_texture});
         }
 
         return state;
