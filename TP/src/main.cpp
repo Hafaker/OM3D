@@ -21,6 +21,8 @@ static float delta_time = 0.0f;
 static std::unique_ptr<Scene> scene;
 static float exposure = 1.0;
 static std::vector<std::string> scene_files;
+static u32 debug_mode = 0;
+
 
 namespace OM3D {
 extern bool audit_bindings_before_draw;
@@ -113,15 +115,18 @@ void gui(ImGuiRenderer& imgui) {
 
     bool open_scene_popup = false;
     if(ImGui::BeginMainMenuBar()) {
-        const char* items[] = { "None", "Albedo", "Normals", "Depth" };
-        static const char* current_mode = NULL;
-        if (ImGui::BeginCombo("Debug Mode", current_mode)) // The second parameter is the label previewed before opening the combo.
+        const char* items[] = {"None", "Albedo", "Normals", "Depth"};
+        static const char* current_item = NULL;
+        if (ImGui::BeginCombo("Debug Mode", current_item)) // The second parameter is the label previewed before opening the combo.
         {
             for (int n = 0; n < IM_ARRAYSIZE(items); n++)
             {
-                bool is_selected = (current_mode == items[n]); // You can store your selection however you want, outside or inside your objects
+                bool is_selected = (current_item == items[n]); // You can store your selection however you want, outside or inside your objects
                 if (ImGui::Selectable(items[n], is_selected))
-                    current_mode = items[n];
+                {
+                    current_item = items[n];
+                    debug_mode = n;
+                }
                 if (is_selected)
                     ImGui::SetItemDefaultFocus();   // You may set the initial focus when opening the combo (scrolling + for keyboard navigation support)
             }
@@ -357,15 +362,20 @@ int main(int argc, char** argv) {
         {
             renderer.display_debug.bind();
             debug_program->bind();
-            renderer.depth_texture.bind(0);
-            renderer.albedo_texture.bind(1);
-            renderer.normals_texture.bind(2);
+            debug_program->set_uniform(HASH("debug_mode"), debug_mode);
+            renderer.albedo_texture.bind(0);
+            renderer.normals_texture.bind(1);
+            renderer.depth_texture.bind(2);
             glDrawArrays(GL_TRIANGLES, 0, 3);
         }
 
         // Blit tonemap result to screen
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
-        renderer.display_debug.blit();
+        if (debug_mode != 0)
+            renderer.display_debug.blit();
+        else
+            renderer.g_framebuffer.blit();
+
         
 
         gui(imgui);
