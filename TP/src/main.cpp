@@ -262,6 +262,7 @@ struct RendererState {
             //state.tone_map_framebuffer = Framebuffer(nullptr, std::array{&state.tone_mapped_texture});
             state.g_framebuffer = Framebuffer(&state.depth_texture, std::array{&state.albedo_texture, &state.normals_texture});
             state.display_debug = Framebuffer(nullptr, std::array{&state.tone_mapped_texture});
+            state.sunlight_framebuffer = Framebuffer(nullptr,std::array{&state.lit_hdr_texture});
         }
 
         return state;
@@ -280,6 +281,7 @@ struct RendererState {
     Framebuffer tone_map_framebuffer;
     Framebuffer g_framebuffer;
     Framebuffer display_debug;
+    Framebuffer sunlight_framebuffer;
 };
 
 
@@ -313,6 +315,7 @@ int main(int argc, char** argv) {
 
     auto tonemap_program = Program::from_files("tonemap.frag", "screen.vert");
     auto debug_program = Program::from_files("debug.frag", "screen.vert");
+    auto sun_lighting_program = Program::from_files("sun_light.frag", "screen.vert");
     RendererState renderer;
 
     for(;;) {
@@ -340,8 +343,28 @@ int main(int argc, char** argv) {
 
         // Render the scene
         {
-            //renderer.main_framebuffer.bind();
-            //scene->render();
+            renderer.g_framebuffer.bind();
+            scene->render();
+        }
+
+        {
+            renderer.sunlight_framebuffer.bind();
+            sun_lighting_program->bind();
+            renderer.albedo_texture.bind(0);
+            renderer.normals_texture.bind(1);
+            glDrawArrays(GL_TRIANGLES, 0, 3);
+        }
+
+        bool debug = false;
+        if (debug)
+        {
+            renderer.display_debug.bind();
+            debug_program->bind();
+            debug_program->set_uniform(HASH("debug_mode"), debug_mode);
+            renderer.albedo_texture.bind(0);
+            renderer.normals_texture.bind(1);
+            renderer.depth_texture.bind(2);
+            glDrawArrays(GL_TRIANGLES, 0, 3);
         }
 
         // Apply a tonemap in compute shader
@@ -354,20 +377,6 @@ int main(int argc, char** argv) {
         }*/
 
         // Render the scene
-        {
-            renderer.g_framebuffer.bind();
-            scene->render();
-        }
-
-        {
-            renderer.display_debug.bind();
-            debug_program->bind();
-            debug_program->set_uniform(HASH("debug_mode"), debug_mode);
-            renderer.albedo_texture.bind(0);
-            renderer.normals_texture.bind(1);
-            renderer.depth_texture.bind(2);
-            glDrawArrays(GL_TRIANGLES, 0, 3);
-        }
 
         // Blit tonemap result to screen
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
