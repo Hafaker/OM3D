@@ -113,6 +113,20 @@ void gui(ImGuiRenderer& imgui) {
 
     bool open_scene_popup = false;
     if(ImGui::BeginMainMenuBar()) {
+        const char* items[] = { "None", "Albedo", "Normals", "Depth" };
+        static const char* current_mode = NULL;
+        if (ImGui::BeginCombo("Debug Mode", current_mode)) // The second parameter is the label previewed before opening the combo.
+        {
+            for (int n = 0; n < IM_ARRAYSIZE(items); n++)
+            {
+                bool is_selected = (current_mode == items[n]); // You can store your selection however you want, outside or inside your objects
+                if (ImGui::Selectable(items[n], is_selected))
+                    current_mode = items[n];
+                if (is_selected)
+                    ImGui::SetItemDefaultFocus();   // You may set the initial focus when opening the combo (scrolling + for keyboard navigation support)
+            }
+            ImGui::EndCombo();
+        }
         if(ImGui::BeginMenu("File")) {
             if(ImGui::MenuItem("Open Scene")) {
                 open_scene_popup = true;
