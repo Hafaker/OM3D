@@ -250,12 +250,13 @@ struct RendererState {
             state.lit_hdr_texture = Texture(size, ImageFormat::RGBA16_FLOAT);
             state.tone_mapped_texture = Texture(size, ImageFormat::RGBA8_UNORM);
             
-            state.albedo_texture = Texture(size, ImageFormat::RGB8_sRGB);
+            state.albedo_texture = Texture(size, ImageFormat::RGBA8_sRGB);
             state.normals_texture = Texture(size, ImageFormat::RGBA8_UNORM);
 
             state.main_framebuffer = Framebuffer(&state.depth_texture, std::array{&state.lit_hdr_texture});
-            state.tone_map_framebuffer = Framebuffer(nullptr, std::array{&state.tone_mapped_texture});
-            state.g_buffer_framebuffer = Framebuffer(&state.depth_texture, std::array{&state.albedo_texture, &state.normals_texture});
+            //state.tone_map_framebuffer = Framebuffer(nullptr, std::array{&state.tone_mapped_texture});
+            state.g_framebuffer = Framebuffer(&state.depth_texture, std::array{&state.albedo_texture, &state.normals_texture});
+            state.display_debug = Framebuffer(&state.depth_texture, std::array{&state.tone_mapped_texture});
         }
 
         return state;
@@ -272,7 +273,8 @@ struct RendererState {
 
     Framebuffer main_framebuffer;
     Framebuffer tone_map_framebuffer;
-    Framebuffer g_buffer_framebuffer;
+    Framebuffer g_framebuffer;
+    Framebuffer display_debug;
 };
 
 
@@ -305,7 +307,7 @@ int main(int argc, char** argv) {
     scene = create_default_scene();
 
     auto tonemap_program = Program::from_files("tonemap.frag", "screen.vert");
-    auto gbuffer_program = Program::from_files("g-buffer.frag", "basic.vert");
+    auto debug_program = Program::from_files("debug.frag", "screen.vert");
     RendererState renderer;
 
     for(;;) {
@@ -333,31 +335,37 @@ int main(int argc, char** argv) {
 
         // Render the scene
         {
-            renderer.main_framebuffer.bind();
+            //renderer.main_framebuffer.bind();
             //scene->render();
         }
 
         // Apply a tonemap in compute shader
-        {
+        /*{
             renderer.tone_map_framebuffer.bind();
             tonemap_program->bind();
             tonemap_program->set_uniform(HASH("exposure"), exposure);
             renderer.lit_hdr_texture.bind(0);
             glDrawArrays(GL_TRIANGLES, 0, 3);
+        }*/
+
+        // Render the scene
+        {
+            renderer.g_framebuffer.bind();
+            scene->render();
         }
 
         {
-            renderer.g_buffer_framebuffer.bind();
-            scene->render();
-
-            gbuffer_program->bind();
-
+            renderer.display_debug.bind();
+            debug_program->bind();
+            renderer.depth_texture.bind(0);
+            renderer.albedo_texture.bind(1);
+            renderer.normals_texture.bind(2);
             glDrawArrays(GL_TRIANGLES, 0, 3);
         }
 
         // Blit tonemap result to screen
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
-        renderer.g_buffer_framebuffer.blit();
+        renderer.display_debug.blit();
         
 
         gui(imgui);
