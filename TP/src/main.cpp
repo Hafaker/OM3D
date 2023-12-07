@@ -21,6 +21,8 @@ static float delta_time = 0.0f;
 static std::unique_ptr<Scene> scene;
 static float exposure = 1.0;
 static std::vector<std::string> scene_files;
+static u32 debug_mode = 0;
+
 
 namespace OM3D {
 extern bool audit_bindings_before_draw;
@@ -113,6 +115,23 @@ void gui(ImGuiRenderer& imgui) {
 
     bool open_scene_popup = false;
     if(ImGui::BeginMainMenuBar()) {
+        const char* items[] = {"None", "Albedo", "Normals", "Depth"};
+        static const char* current_item = NULL;
+        if (ImGui::BeginCombo("Debug Mode", current_item)) // The second parameter is the label previewed before opening the combo.
+        {
+            for (int n = 0; n < IM_ARRAYSIZE(items); n++)
+            {
+                bool is_selected = (current_item == items[n]); // You can store your selection however you want, outside or inside your objects
+                if (ImGui::Selectable(items[n], is_selected))
+                {
+                    current_item = items[n];
+                    debug_mode = n;
+                }
+                if (is_selected)
+                    ImGui::SetItemDefaultFocus();   // You may set the initial focus when opening the combo (scrolling + for keyboard navigation support)
+            }
+            ImGui::EndCombo();
+        }
         if(ImGui::BeginMenu("File")) {
             if(ImGui::MenuItem("Open Scene")) {
                 open_scene_popup = true;
@@ -235,8 +254,14 @@ struct RendererState {
             state.depth_texture = Texture(size, ImageFormat::Depth32_FLOAT);
             state.lit_hdr_texture = Texture(size, ImageFormat::RGBA16_FLOAT);
             state.tone_mapped_texture = Texture(size, ImageFormat::RGBA8_UNORM);
+            
+            state.albedo_texture = Texture(size, ImageFormat::RGBA8_sRGB);
+            state.normals_texture = Texture(size, ImageFormat::RGBA8_UNORM);
+
             state.main_framebuffer = Framebuffer(&state.depth_texture, std::array{&state.lit_hdr_texture});
-            state.tone_map_framebuffer = Framebuffer(nullptr, std::array{&state.tone_mapped_texture});
+            //state.tone_map_framebuffer = Framebuffer(nullptr, std::array{&state.tone_mapped_texture});
+            state.g_framebuffer = Framebuffer(&state.depth_texture, std::array{&state.albedo_texture, &state.normals_texture});
+            state.display_debug = Framebuffer(&state.depth_texture, std::array{&state.tone_mapped_texture});
         }
 
         return state;
@@ -248,8 +273,13 @@ struct RendererState {
     Texture lit_hdr_texture;
     Texture tone_mapped_texture;
 
+    Texture albedo_texture;
+    Texture normals_texture;
+
     Framebuffer main_framebuffer;
     Framebuffer tone_map_framebuffer;
+    Framebuffer g_framebuffer;
+    Framebuffer display_debug;
 };
 
 
@@ -282,6 +312,7 @@ int main(int argc, char** argv) {
     scene = create_default_scene();
 
     auto tonemap_program = Program::from_files("tonemap.frag", "screen.vert");
+    auto debug_program = Program::from_files("debug.frag", "screen.vert");
     RendererState renderer;
 
     for(;;) {
@@ -309,22 +340,43 @@ int main(int argc, char** argv) {
 
         // Render the scene
         {
-            renderer.main_framebuffer.bind();
-            scene->render();
+            //renderer.main_framebuffer.bind();
+            //scene->render();
         }
 
         // Apply a tonemap in compute shader
-        {
+        /*{
             renderer.tone_map_framebuffer.bind();
             tonemap_program->bind();
             tonemap_program->set_uniform(HASH("exposure"), exposure);
             renderer.lit_hdr_texture.bind(0);
             glDrawArrays(GL_TRIANGLES, 0, 3);
+        }*/
+
+        // Render the scene
+        {
+            renderer.g_framebuffer.bind();
+            scene->render();
+        }
+
+        {
+            renderer.display_debug.bind();
+            debug_program->bind();
+            debug_program->set_uniform(HASH("debug_mode"), debug_mode);
+            renderer.albedo_texture.bind(0);
+            renderer.normals_texture.bind(1);
+            renderer.depth_texture.bind(2);
+            glDrawArrays(GL_TRIANGLES, 0, 3);
         }
 
         // Blit tonemap result to screen
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
-        renderer.tone_map_framebuffer.blit();
+        if (debug_mode != 0)
+            renderer.display_debug.blit();
+        else
+            renderer.g_framebuffer.blit();
+
+        
 
         gui(imgui);
 
