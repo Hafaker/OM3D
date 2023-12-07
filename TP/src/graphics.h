@@ -9,6 +9,7 @@ namespace OM3D {
 
 static constexpr std::string_view shader_path = "../../shaders/";
 static constexpr std::string_view data_path = "../../data/";
+static constexpr std::string_view resources_path = "../../Resources/";
 
 class GLHandle : NonCopyable {
     public:
