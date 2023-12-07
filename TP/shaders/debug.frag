@@ -16,7 +16,7 @@ void main() {
     else if (debug_mode == 2)
         out_color = texture(in_normal, in_uv);
     else if (debug_mode == 3)
-        out_color = texture(in_depth, in_uv);
+        out_color = pow(texture(in_depth, in_uv).r,0.3).xxxx;
 
     else 
         out_color = texture(in_color, in_uv);
