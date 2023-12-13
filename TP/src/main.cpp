@@ -259,10 +259,10 @@ struct RendererState {
             state.normals_texture = Texture(size, ImageFormat::RGBA8_UNORM);
 
             state.main_framebuffer = Framebuffer(&state.depth_texture, std::array{&state.lit_hdr_texture});
-            //state.tone_map_framebuffer = Framebuffer(nullptr, std::array{&state.tone_mapped_texture});
+            state.tone_map_framebuffer = Framebuffer(nullptr, std::array{&state.tone_mapped_texture});
             state.g_framebuffer = Framebuffer(&state.depth_texture, std::array{&state.albedo_texture, &state.normals_texture});
             state.display_debug = Framebuffer(nullptr, std::array{&state.tone_mapped_texture});
-            state.sunlight_framebuffer = Framebuffer(nullptr,std::array{&state.lit_hdr_texture});
+            state.lights_framebuffer = Framebuffer(nullptr,std::array{&state.lit_hdr_texture});
         }
 
         return state;
@@ -281,7 +281,8 @@ struct RendererState {
     Framebuffer tone_map_framebuffer;
     Framebuffer g_framebuffer;
     Framebuffer display_debug;
-    Framebuffer sunlight_framebuffer;
+    Framebuffer lights_framebuffer;
+    Framebuffer test;
 };
 
 
@@ -316,7 +317,10 @@ int main(int argc, char** argv) {
     auto tonemap_program = Program::from_files("tonemap.frag", "screen.vert");
     auto debug_program = Program::from_files("debug.frag", "screen.vert");
     auto sun_lighting_program = Program::from_files("sun_light.frag", "screen.vert");
+    auto point_light_lighting_program = Program::from_files("points_light.frag", "screen.vert");
     RendererState renderer;
+
+    bool debug = false;
 
     for(;;) {
 
@@ -348,14 +352,20 @@ int main(int argc, char** argv) {
         }
 
         {
-            renderer.sunlight_framebuffer.bind();
+            renderer.lights_framebuffer.bind();
             sun_lighting_program->bind();
-            renderer.albedo_texture.bind(0);
-            renderer.normals_texture.bind(1);
+            renderer.albedo_texture.bind(2);
+            renderer.normals_texture.bind(3);
             glDrawArrays(GL_TRIANGLES, 0, 3);
+
+            point_light_lighting_program->bind();
+            renderer.albedo_texture.bind(2);
+            renderer.normals_texture.bind(3);
+            renderer.depth_texture.bind(4);
+            
+            
         }
 
-        bool debug = false;
         if (debug)
         {
             renderer.display_debug.bind();
@@ -368,13 +378,13 @@ int main(int argc, char** argv) {
         }
 
         // Apply a tonemap in compute shader
-        /*{
+        {
             renderer.tone_map_framebuffer.bind();
             tonemap_program->bind();
             tonemap_program->set_uniform(HASH("exposure"), exposure);
             renderer.lit_hdr_texture.bind(0);
             glDrawArrays(GL_TRIANGLES, 0, 3);
-        }*/
+        }
 
         // Render the scene
 
@@ -383,7 +393,7 @@ int main(int argc, char** argv) {
         if (debug_mode != 0)
             renderer.display_debug.blit();
         else
-            renderer.g_framebuffer.blit();
+            renderer.tone_map_framebuffer.blit();
 
         
 
