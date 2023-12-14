@@ -28,16 +28,16 @@ class Scene : NonMovable {
         Camera& camera();
         const Camera& camera() const;
 
-        void set_sun(glm::vec3 direction, glm::vec3 color = glm::vec3(1.0f));
-        glm::vec3 get_sun_dir();
-        glm::vec3 get_sun_col();
+        void set_sun(glm::vec3 direction, glm::vec3 color);
+        const glm::vec3 get_sun_dir();
+        const glm::vec3 get_sun_col();
 
     private:
         std::vector<SceneObject> _objects;
         std::vector<PointLight> _point_lights;
 
-        glm::vec3 _sun_direction = glm::vec3(0.2f, 1.0f, 0.1f);
-        glm::vec3 _sun_color = glm::vec3(1.0f);
+        glm::vec3 _sun_direction;
+        glm::vec3 _sun_color;
 
         Camera _camera;
 };

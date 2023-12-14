@@ -38,11 +38,11 @@ void Scene::set_sun(glm::vec3 direction, glm::vec3 color) {
     _sun_color = color;
 }
 
-glm::vec3 Scene::get_sun_col() {
+const glm::vec3 Scene::get_sun_col() {
     return _sun_color;
 }
 
-glm::vec3 Scene::get_sun_dir() {
+const glm::vec3 Scene::get_sun_dir() {
     return _sun_direction;
 }
 

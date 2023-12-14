@@ -172,10 +172,18 @@ void gui(ImGuiRenderer& imgui) {
         ImGui::OpenPopup("###openscenepopup");
 
         scene_files.clear();
-        for(auto&& entry : std::filesystem::directory_iterator(data_path)) {
-            if(entry.status().type() == std::filesystem::file_type::regular) {
+        for (auto&& entry : std::filesystem::directory_iterator(data_path)) {
+            if (entry.status().type() == std::filesystem::file_type::regular) {
                 const auto ext = entry.path().extension();
-                if(ext == ".gltf" || ext == ".glb") {
+                if (ext == ".gltf" || ext == ".glb") {
+                    scene_files.emplace_back(entry.path().string());
+                }
+            }
+        }
+        for (auto&& entry : std::filesystem::directory_iterator(resources_path)) {
+            if (entry.status().type() == std::filesystem::file_type::regular) {
+                const auto ext = entry.path().extension();
+                if (ext == ".gltf" || ext == ".glb") {
                     scene_files.emplace_back(entry.path().string());
                 }
             }
@@ -219,11 +227,11 @@ std::unique_ptr<Scene> create_default_scene() {
     auto scene = std::make_unique<Scene>();
 
     // Load default cube model
-    auto result = Scene::from_gltf(std::string(data_path) + "cube.glb");
+    auto result = Scene::from_gltf(std::string(resources_path) + "bistro.glb");
     ALWAYS_ASSERT(result.is_ok, "Unable to load default scene");
     scene = std::move(result.value);
 
-    scene->set_sun(glm::vec3(0.2f, 1.0f, 0.1f), glm::vec3(1.0f,0.f,0.f));
+    scene->set_sun(glm::vec3(0.2f, 1.0f, 0.1f), glm::vec3(1.0f, 0.5f, 0.5f));
 
     // Add lights
     {
@@ -357,8 +365,8 @@ int main(int argc, char** argv) {
             renderer.normals_texture.bind(1);
             renderer.depth_texture.bind(2);
 
-            sun_lighting_program->set_uniform(HASH("uSun.direction"), scene->get_sun_dir());
-            sun_lighting_program->set_uniform(HASH("uSun.color"), scene->get_sun_col());
+            sun_lighting_program->set_uniform(HASH("uSunDirection"), scene->get_sun_dir());
+            sun_lighting_program->set_uniform(HASH("uSunColor"), scene->get_sun_col());
 
             glDrawArrays(GL_TRIANGLES, 0, 3);
 
