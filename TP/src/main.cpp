@@ -223,7 +223,7 @@ std::unique_ptr<Scene> create_default_scene() {
     ALWAYS_ASSERT(result.is_ok, "Unable to load default scene");
     scene = std::move(result.value);
 
-    scene->set_sun(glm::vec3(0.2f, 1.0f, 0.1f), glm::vec3(1.0f));
+    scene->set_sun(glm::vec3(0.2f, 1.0f, 0.1f), glm::vec3(1.0f,0.f,0.f));
 
     // Add lights
     {
@@ -282,7 +282,6 @@ struct RendererState {
     Framebuffer g_framebuffer;
     Framebuffer display_debug;
     Framebuffer lights_framebuffer;
-    Framebuffer test;
 };
 
 
@@ -317,7 +316,7 @@ int main(int argc, char** argv) {
     auto tonemap_program = Program::from_files("tonemap.frag", "screen.vert");
     auto debug_program = Program::from_files("debug.frag", "screen.vert");
     auto sun_lighting_program = Program::from_files("sun_light.frag", "screen.vert");
-    auto point_light_lighting_program = Program::from_files("points_light.frag", "screen.vert");
+    //auto point_light_lighting_program = Program::from_files("points_light.frag", "screen.vert");
     RendererState renderer;
 
     bool debug = false;
@@ -354,29 +353,24 @@ int main(int argc, char** argv) {
         {
             renderer.lights_framebuffer.bind();
             sun_lighting_program->bind();
-            renderer.albedo_texture.bind(2);
-            renderer.normals_texture.bind(3);
-            glDrawArrays(GL_TRIANGLES, 0, 3);
-
-            point_light_lighting_program->bind();
-            renderer.albedo_texture.bind(2);
-            renderer.normals_texture.bind(3);
-            renderer.depth_texture.bind(4);
-            
-            
-        }
-
-        if (debug)
-        {
-            renderer.display_debug.bind();
-            debug_program->bind();
-            debug_program->set_uniform(HASH("debug_mode"), debug_mode);
             renderer.albedo_texture.bind(0);
             renderer.normals_texture.bind(1);
             renderer.depth_texture.bind(2);
+
+            sun_lighting_program->set_uniform(HASH("uSun.direction"), scene->get_sun_dir());
+            sun_lighting_program->set_uniform(HASH("uSun.color"), scene->get_sun_col());
+
             glDrawArrays(GL_TRIANGLES, 0, 3);
+
+          /*  point_light_lighting_program->bind();
+            renderer.albedo_texture.bind(2);
+            renderer.normals_texture.bind(3);
+            renderer.depth_texture.bind(4);*/
+            
+            
         }
 
+        /*
         // Apply a tonemap in compute shader
         {
             renderer.tone_map_framebuffer.bind();
@@ -384,18 +378,15 @@ int main(int argc, char** argv) {
             tonemap_program->set_uniform(HASH("exposure"), exposure);
             renderer.lit_hdr_texture.bind(0);
             glDrawArrays(GL_TRIANGLES, 0, 3);
-        }
+        }*/ 
 
         // Render the scene
 
         // Blit tonemap result to screen
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
-        if (debug_mode != 0)
-            renderer.display_debug.blit();
-        else
-            renderer.tone_map_framebuffer.blit();
-
         
+        renderer.lights_framebuffer.blit();
+
 
         gui(imgui);
 
