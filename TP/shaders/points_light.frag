@@ -11,13 +11,12 @@ layout(binding = 3) uniform sampler2D in_depth;
 layout(binding = 4) uniform sampler2D in_normal;
 
 
-layout(binding = 0) uniform Data {
-    FrameData frame;
-};
+uniform mat4 view_proj;
+uniform uint point_light_count;
 
-layout(binding = 1) buffer PointLights {
-    PointLight point_lights[];
-};
+uniform vec3 lightpos[100];
+uniform vec3 lightcolor[100];
+uniform float lightradius[100];
 
 vec3 unproject(vec2 uv, float depth, mat4 inv_viewproj) {
     const vec3 ndc = vec3(uv * 2.0 - vec2(1.0), depth);
@@ -34,24 +33,22 @@ void main() {
     if (depth == 0.0)
         return;
 
-    mat4 inv_viewproj = inverse(frame.camera.view_proj);
+    mat4 inv_viewproj = inverse(view_proj);
     vec3 pos = unproject(in_uv, depth, inv_viewproj);
 
     vec3 acc = vec3(0.0);
 
-    for (uint i = 0; i != frame.point_light_count; ++i) {
-        PointLight light = point_lights[i];
-        const vec3 to_light = (light.position - pos);
+    for (uint i = 0; i != point_light_count; ++i) {
+        const vec3 to_light = (lightpos[i] - pos);
         const float dist = length(to_light);
         const vec3 light_vec = to_light / dist;
 
         const float NoL = dot(light_vec, normal);
-        const float att = attenuation(dist, light.radius);
+        const float att = attenuation(dist, lightradius[i]);
         if(NoL <= 0.0 || att <= 0.0f) {
             continue;
         }
-
-        acc += light.color * (NoL * att);
+        acc += lightcolor[i] * (NoL * att);
     }
 
     out_color = vec4(color * acc, 1.0);

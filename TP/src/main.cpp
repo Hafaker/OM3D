@@ -316,7 +316,7 @@ int main(int argc, char** argv) {
     auto tonemap_program = Program::from_files("tonemap.frag", "screen.vert");
     auto debug_program = Program::from_files("debug.frag", "screen.vert");
     auto sun_lighting_program = Program::from_files("sun_light.frag", "screen.vert");
-    //auto point_light_lighting_program = Program::from_files("points_light.frag", "screen.vert");
+    auto point_light_lighting_program = Program::from_files("points_light.frag", "screen.vert");
     RendererState renderer;
 
     bool debug = false;
@@ -362,15 +362,28 @@ int main(int argc, char** argv) {
 
             glDrawArrays(GL_TRIANGLES, 0, 3);
 
-          /*  point_light_lighting_program->bind();
+            point_light_lighting_program->bind();
             renderer.albedo_texture.bind(2);
             renderer.normals_texture.bind(3);
-            renderer.depth_texture.bind(4);*/
-            
-            
+            renderer.depth_texture.bind(4);
+
+            point_light_lighting_program->set_uniform(HASH("view_proj"), scene->camera().view_proj_matrix());
+            point_light_lighting_program->set_uniform(HASH("point_light_count"), u32(scene->point_lights().size()));
+
+            Span<const PointLight> pointLights = scene->point_lights();
+
+            for (size_t i = 0; i < pointLights.size(); ++i) {
+                std::string pl_pos = "lightpos[" + std::to_string(i) + "]";
+                std::string pl_col = "lightcolor[" + std::to_string(i) + "]";
+                std::string pl_rad = "lightradius[" + std::to_string(i) + "]";
+                point_light_lighting_program->set_uniform(pl_pos.c_str(), pointLights[i].position());
+                point_light_lighting_program->set_uniform(pl_col.c_str(), pointLights[i].color());
+                point_light_lighting_program->set_uniform(pl_rad.c_str(), pointLights[i].radius());
+            }
+            //glDrawArrays(GL_TRIANGLES, 0, 3);
         }
 
-        /*
+        
         // Apply a tonemap in compute shader
         {
             renderer.tone_map_framebuffer.bind();
@@ -378,14 +391,14 @@ int main(int argc, char** argv) {
             tonemap_program->set_uniform(HASH("exposure"), exposure);
             renderer.lit_hdr_texture.bind(0);
             glDrawArrays(GL_TRIANGLES, 0, 3);
-        }*/ 
+        } 
 
         // Render the scene
 
         // Blit tonemap result to screen
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
         
-        renderer.lights_framebuffer.blit();
+        renderer.tone_map_framebuffer.blit();
 
 
         gui(imgui);
