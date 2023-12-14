@@ -172,10 +172,18 @@ void gui(ImGuiRenderer& imgui) {
         ImGui::OpenPopup("###openscenepopup");
 
         scene_files.clear();
-        for(auto&& entry : std::filesystem::directory_iterator(data_path)) {
-            if(entry.status().type() == std::filesystem::file_type::regular) {
+        for (auto&& entry : std::filesystem::directory_iterator(data_path)) {
+            if (entry.status().type() == std::filesystem::file_type::regular) {
                 const auto ext = entry.path().extension();
-                if(ext == ".gltf" || ext == ".glb") {
+                if (ext == ".gltf" || ext == ".glb") {
+                    scene_files.emplace_back(entry.path().string());
+                }
+            }
+        }
+        for (auto&& entry : std::filesystem::directory_iterator(resources_path)) {
+            if (entry.status().type() == std::filesystem::file_type::regular) {
+                const auto ext = entry.path().extension();
+                if (ext == ".gltf" || ext == ".glb") {
                     scene_files.emplace_back(entry.path().string());
                 }
             }
@@ -228,13 +236,12 @@ std::unique_ptr<Scene> create_default_scene() {
     auto scene = std::make_unique<Scene>();
 
     // Load default cube model
-    auto result = Scene::from_gltf(std::string(resources_path) + "forest.glb");
+    auto result = Scene::from_gltf(std::string(resources_path) + "bistro.glb");
 
-    //auto result = Scene::from_gltf(std::string(data_path) + "cube.glb");
     ALWAYS_ASSERT(result.is_ok, "Unable to load default scene");
     scene = std::move(result.value);
 
-    scene->set_sun(glm::vec3(0.2f, 1.0f, 0.1f), glm::vec3(1.0f));
+    scene->set_sun(glm::vec3(0.2f, 1.0f, 0.1f), glm::vec3(1.0f, 0.5f, 0.5f));
 
     // Add lights
     {
@@ -270,9 +277,10 @@ struct RendererState {
             state.normals_texture = Texture(size, ImageFormat::RGBA8_UNORM);
 
             state.main_framebuffer = Framebuffer(&state.depth_texture, std::array{&state.lit_hdr_texture});
-            //state.tone_map_framebuffer = Framebuffer(nullptr, std::array{&state.tone_mapped_texture});
+            state.tone_map_framebuffer = Framebuffer(nullptr, std::array{&state.tone_mapped_texture});
             state.g_framebuffer = Framebuffer(&state.depth_texture, std::array{&state.albedo_texture, &state.normals_texture});
             state.display_debug = Framebuffer(nullptr, std::array{&state.tone_mapped_texture});
+            state.lights_framebuffer = Framebuffer(nullptr,std::array{&state.lit_hdr_texture});
         }
 
         return state;
@@ -291,6 +299,7 @@ struct RendererState {
     Framebuffer tone_map_framebuffer;
     Framebuffer g_framebuffer;
     Framebuffer display_debug;
+    Framebuffer lights_framebuffer;
 };
 
 
@@ -324,7 +333,11 @@ int main(int argc, char** argv) {
 
     auto tonemap_program = Program::from_files("tonemap.frag", "screen.vert");
     auto debug_program = Program::from_files("debug.frag", "screen.vert");
+    auto sun_lighting_program = Program::from_files("sun_light.frag", "screen.vert");
+    auto point_light_lighting_program = Program::from_files("points_light.frag", "screen.vert");
     RendererState renderer;
+
+    bool debug = false;
 
     for(;;) {
 
@@ -351,43 +364,60 @@ int main(int argc, char** argv) {
 
         // Render the scene
         {
-            //renderer.main_framebuffer.bind();
-            //scene->render();
-        }
-
-        // Apply a tonemap in compute shader
-        /*{
-            renderer.tone_map_framebuffer.bind();
-            tonemap_program->bind();
-            tonemap_program->set_uniform(HASH("exposure"), exposure);
-            renderer.lit_hdr_texture.bind(0);
-            glDrawArrays(GL_TRIANGLES, 0, 3);
-        }*/
-
-        // Render the scene
-        {
             renderer.g_framebuffer.bind();
             scene->render();
         }
 
         {
-            renderer.display_debug.bind();
-            debug_program->bind();
-            debug_program->set_uniform(HASH("debug_mode"), debug_mode);
+            renderer.lights_framebuffer.bind();
+            sun_lighting_program->bind();
             renderer.albedo_texture.bind(0);
             renderer.normals_texture.bind(1);
             renderer.depth_texture.bind(2);
+
+            sun_lighting_program->set_uniform(HASH("uSunDirection"), scene->get_sun_dir());
+            sun_lighting_program->set_uniform(HASH("uSunColor"), scene->get_sun_col());
+
             glDrawArrays(GL_TRIANGLES, 0, 3);
+
+            point_light_lighting_program->bind();
+            renderer.albedo_texture.bind(2);
+            renderer.normals_texture.bind(3);
+            renderer.depth_texture.bind(4);
+
+            point_light_lighting_program->set_uniform(HASH("view_proj"), scene->camera().view_proj_matrix());
+            point_light_lighting_program->set_uniform(HASH("point_light_count"), u32(scene->point_lights().size()));
+
+            Span<const PointLight> pointLights = scene->point_lights();
+
+            for (size_t i = 0; i < pointLights.size(); ++i) {
+                std::string pl_pos = "lightpos[" + std::to_string(i) + "]";
+                std::string pl_col = "lightcolor[" + std::to_string(i) + "]";
+                std::string pl_rad = "lightradius[" + std::to_string(i) + "]";
+                point_light_lighting_program->set_uniform(pl_pos.c_str(), pointLights[i].position());
+                point_light_lighting_program->set_uniform(pl_col.c_str(), pointLights[i].color());
+                point_light_lighting_program->set_uniform(pl_rad.c_str(), pointLights[i].radius());
+            }
+            //glDrawArrays(GL_TRIANGLES, 0, 3);
         }
+
+        
+        // Apply a tonemap in compute shader
+        {
+            renderer.tone_map_framebuffer.bind();
+            tonemap_program->bind();
+            tonemap_program->set_uniform(HASH("exposure"), exposure);
+            renderer.lit_hdr_texture.bind(0);
+            glDrawArrays(GL_TRIANGLES, 0, 3);
+        } 
+
+        // Render the scene
 
         // Blit tonemap result to screen
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
-        if (debug_mode != 0)
-            renderer.display_debug.blit();
-        else
-            renderer.g_framebuffer.blit();
-
         
+        renderer.tone_map_framebuffer.blit();
+
 
         gui(imgui);
 
