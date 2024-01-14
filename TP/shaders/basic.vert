@@ -20,9 +20,20 @@ layout(binding = 0) uniform Data {
 };
 
 uniform mat4 model;
+uniform vec4 rotation;
+
+mat4 quaternionToRotationMatrix(vec4 q) {
+    return mat4(
+        1.0 - 2.0 * (q.y * q.y + q.z * q.z), 2.0 * (q.x * q.y - q.w * q.z), 2.0 * (q.x * q.z + q.w * q.y), 0.0,
+        2.0 * (q.x * q.y + q.w * q.z), 1.0 - 2.0 * (q.x * q.x + q.z * q.z), 2.0 * (q.y * q.z - q.w * q.x), 0.0,
+        2.0 * (q.x * q.z - q.w * q.y), 2.0 * (q.y * q.z + q.w * q.x), 1.0 - 2.0 * (q.x * q.x + q.y * q.y), 0.0,
+        0.0, 0.0, 0.0, 1.0
+    );
+}
 
 void main() {
-    const vec4 position = model * vec4(in_pos, 1.0);
+    mat4 rotationMatrix = quaternionToRotationMatrix(rotation);
+    const vec4 position = model * vec4(in_pos, 1.0) * rotationMatrix;
 
     out_normal = normalize(mat3(model) * in_normal);
     out_tangent = normalize(mat3(model) * in_tangent_bitangent_sign.xyz);

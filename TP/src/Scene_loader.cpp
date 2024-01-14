@@ -6,6 +6,7 @@
 #include <utils.h>
 
 #include <iostream>
+#include <cmath>
 
 #define TINYGLTF_IMPLEMENTATION
 #define TINYGLTF_NO_STB_IMAGE_WRITE
@@ -188,7 +189,6 @@ static Result<MeshData> build_mesh_data(const tinygltf::Model& gltf, const tinyg
             return {false, {}};
         }
     }
-
     return {true, MeshData{std::move(vertices), std::move(indices)}};
 }
 
@@ -293,6 +293,49 @@ static void compute_tangents(MeshData& mesh) {
     }
 }
 
+void manageAnimation(tinygltf::Model gltf, OM3D::SceneObject& scene_object) {
+    for (tinygltf::Animation animation : gltf.animations) {
+        int sampler = animation.channels[0].sampler;
+        int target_node_id = animation.channels[0].target_node;
+
+        tinygltf::Node target_node = gltf.nodes[target_node_id];
+
+        std::vector<std::vector<double>> rotations;
+
+        if (target_node.rotation.size() > 0) {
+            rotations.push_back(target_node.rotation);
+        }
+
+        int accessor_input = animation.samplers[0].input;
+        size_t nbKeyFrames = gltf.accessors[accessor_input].count;
+        double totalAnimationTime = gltf.accessors[accessor_input].maxValues[0];
+
+        float theta = 360.0f / (nbKeyFrames - 1);
+
+        for (size_t i = 1; i < nbKeyFrames - 1; i++) {
+            double scalar = cos(glm::radians(theta));
+            std::cout << scalar << std::endl;
+            glm::vec3 v = glm::vec3(0.0f, 0.0f, 1.0f) * glm::sin(glm::radians(theta));
+            std::vector<double> rotation = {v.x, v.y, v.z, scalar};
+            rotations.push_back(rotation);
+        }
+
+        rotations.push_back(target_node.rotation);
+
+        std::vector<double> timestamps = {0.0};
+        double step = totalAnimationTime / (nbKeyFrames - 1);
+        double i = step;
+        while (i <= totalAnimationTime) {
+            timestamps.push_back(i);
+            i += step;
+        }
+
+        scene_object._rotations = rotations;
+        scene_object._timestamps = timestamps;
+
+        std::string target_path = animation.channels[0].target_path;
+    }
+}
 
 Result<std::unique_ptr<Scene>> Scene::from_gltf(const std::string& file_name) {
     const double time = program_time();
@@ -435,6 +478,10 @@ Result<std::unique_ptr<Scene>> Scene::from_gltf(const std::string& file_name) {
 
             auto scene_object = SceneObject(std::make_shared<StaticMesh>(mesh.value), std::move(material));
             scene_object.set_transform(node_transform);
+
+            if (gltf.animations.size() > 0)
+                manageAnimation(gltf, scene_object);
+
             scene->add_object(std::move(scene_object));
         }
     }
@@ -455,7 +502,6 @@ Result<std::unique_ptr<Scene>> Scene::from_gltf(const std::string& file_name) {
         }
         scene->add_light(light);
     }
-
 
     return {true, std::move(scene)};
 }

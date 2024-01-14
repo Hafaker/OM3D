@@ -20,7 +20,10 @@ class SceneObject {
         void render(Frustum frustum) const;
 
         void set_transform(const glm::mat4& tr);
+        void add_transform(const glm::vec4& tr);
         const glm::mat4& transform() const;
+        std::vector<std::vector<double>> _rotations;
+        std::vector<double> _timestamps;
 
     private:
         glm::mat4 _transform = glm::mat4(1.0f);

@@ -236,7 +236,7 @@ std::unique_ptr<Scene> create_default_scene() {
     auto scene = std::make_unique<Scene>();
 
     // Load default cube model
-    auto result = Scene::from_gltf(std::string(resources_path) + "bistro.glb");
+    auto result = Scene::from_gltf(std::string(data_path) + "animatedCube/AnimatedCube.gltf");
 
     ALWAYS_ASSERT(result.is_ok, "Unable to load default scene");
     scene = std::move(result.value);
