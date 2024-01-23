@@ -236,7 +236,7 @@ std::unique_ptr<Scene> create_default_scene() {
     auto scene = std::make_unique<Scene>();
 
     // Load default cube model
-    auto result = Scene::from_gltf(std::string(data_path) + "animatedCube/AnimatedCube.gltf");
+    auto result = Scene::from_gltf(std::string(data_path) + "riggedSimple/RiggedSimple.gltf");
 
     ALWAYS_ASSERT(result.is_ok, "Unable to load default scene");
     scene = std::move(result.value);
@@ -332,7 +332,7 @@ int main(int argc, char** argv) {
     scene = create_default_scene();
 
     auto tonemap_program = Program::from_files("tonemap.frag", "screen.vert");
-    auto debug_program = Program::from_files("debug.frag", "screen.vert");
+    //auto debug_program = Program::from_files("debug.frag", "screen.vert");
     auto sun_lighting_program = Program::from_files("sun_light.frag", "screen.vert");
     auto point_light_lighting_program = Program::from_files("points_light.frag", "screen.vert");
     RendererState renderer;
@@ -364,11 +364,11 @@ int main(int argc, char** argv) {
 
         // Render the scene
         {
-            renderer.g_framebuffer.bind();
+            renderer.main_framebuffer.bind();
             scene->render();
         }
 
-        {
+        /*{
             renderer.lights_framebuffer.bind();
             sun_lighting_program->bind();
             renderer.albedo_texture.bind(0);
@@ -399,7 +399,7 @@ int main(int argc, char** argv) {
                 point_light_lighting_program->set_uniform(pl_rad.c_str(), pointLights[i].radius());
             }
             //glDrawArrays(GL_TRIANGLES, 0, 3);
-        }
+        }*/
 
         
         // Apply a tonemap in compute shader

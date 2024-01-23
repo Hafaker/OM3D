@@ -10,18 +10,13 @@ SceneObject::SceneObject(std::shared_ptr<StaticMesh> mesh, std::shared_ptr<Mater
     _material(std::move(material)) {
 }
 
-bool testPlane(std::shared_ptr<StaticMesh> mesh, glm::vec3& plane_normal, glm::vec3 plane_position)
-{
-    SphereBoundingBox bbox = mesh->_bbox;
-
-    float distance_normal = glm::length(plane_normal);
-    
-    glm::vec3 vect_origin(
-        plane_normal.x < 0.0f ? -distance_normal : distance_normal,
-        plane_normal.y < 0.0f ? -distance_normal : distance_normal,
-        plane_normal.z < 0.0f ? -distance_normal : distance_normal
+glm::mat4 quatToRotationMatrix(glm::vec4 q) {
+    return glm::mat4(
+        1.0 - 2.0 * (q.y * q.y + q.z * q.z), 2.0 * (q.x * q.y - q.w * q.z), 2.0 * (q.x * q.z + q.w * q.y), 0.0,
+        2.0 * (q.x * q.y + q.w * q.z), 1.0 - 2.0 * (q.x * q.x + q.z * q.z), 2.0 * (q.y * q.z - q.w * q.x), 0.0,
+        2.0 * (q.x * q.z - q.w * q.y), 2.0 * (q.y * q.z + q.w * q.x), 1.0 - 2.0 * (q.x * q.x + q.y * q.y), 0.0,
+        0.0, 0.0, 0.0, 1.0
     );
-    return dot(plane_normal, vect_origin - plane_position) > 0;
 }
 
 glm::vec4 slerp(glm::vec4 previousRotation, glm::vec4 nextRotation, double interpolationValue)
@@ -47,12 +42,12 @@ glm::vec4 slerp(glm::vec4 previousRotation, glm::vec4 nextRotation, double inter
         return static_cast<float>(scalePreviousQuat) * previousRotation + static_cast<float>(scaleNextQuat) * nextRotation;
 }
 
-std::vector<size_t> findKeyFrames(double currentTime, std::vector<double> timestamps) {
+std::vector<size_t> findSurroundingTimestamps(double currentTime, std::vector<double> timestamps) {
 
     size_t before = 0;
-    size_t after = 2;
+    size_t after = 0;
 
-    // Iterate through timestamps to find the keyframes
+    // Iterate through timestamps to find the surrounding
     for (size_t i = 0; i < timestamps.size() - 1; i++) {
         if (timestamps[i] <= currentTime && timestamps[i + 1] >= currentTime) {
             before = i;
@@ -65,11 +60,25 @@ std::vector<size_t> findKeyFrames(double currentTime, std::vector<double> timest
     return timeIndexes;
 }
 
+glm::vec3 interpolateTransformation(std::vector<std::vector<double>> transformations, std::vector<double> timestamps, std::vector<size_t> timeIndexes, double time) {
+    
+    double timestamp1 = timestamps[timeIndexes[0]];
+    double timestamp2 = timestamps[timeIndexes[1]];
+    double t = (time - timestamp1) / (timestamp2 - timestamp1);
+
+    glm::vec3 transform1 = glm::vec3(transformations[timeIndexes[0]][0], transformations[timeIndexes[0]][1], transformations[timeIndexes[0]][2]);
+    glm::vec3 transform2 = glm::vec3(transformations[timeIndexes[1]][0], transformations[timeIndexes[1]][1], transformations[timeIndexes[1]][2]);
+
+    glm::vec3 interpolatedTranslation = transform1 + static_cast<float>(t) * (transform2 - transform1);
+
+    return interpolatedTranslation;
+}
+
 glm::vec4 interpolateRotation(std::vector<std::vector<double>> rotations, std::vector<double> timestamps) {
 
     double time = fmod(program_time(), 2.0);
 
-    std::vector<size_t> timeIndexes = findKeyFrames(time, timestamps);
+    std::vector<size_t> timeIndexes = findSurroundingTimestamps(time, timestamps);
     std::vector<double> previousRotationVector = rotations[timeIndexes[0]];
     glm::vec4 previousRotation = glm::vec4(previousRotationVector[0], previousRotationVector[1], previousRotationVector[2], previousRotationVector[3]);
 
@@ -93,21 +102,53 @@ void SceneObject::render(Frustum frustum) const {
         return;
     }
 
-    glm::vec4 rotation = interpolateRotation(_rotations, _timestamps);
+    double time = fmod(program_time(), 2.0);
+    std::vector<size_t> timeIndexes = findSurroundingTimestamps(time, _timestamps);
 
-    _material->set_uniform(HASH("rotation"), rotation);
+    glm::vec3 scale = glm::vec3(1.0);
+    if (_scales.size() > 0) {
+        scale = interpolateTransformation(_scales, _timestamps, timeIndexes, time);
+    }
 
-    _material->set_uniform(HASH("model"), transform());
+    glm::vec3 translation = glm::vec3(0.0);
+    if (_translations.size() > 0) {
+        translation = interpolateTransformation(_translations, _timestamps, timeIndexes, time);
+    }
+    glm::vec4 rotation = glm::vec4(0.0);
+    if (_rotations.size() > 0) {
+        rotation = interpolateRotation(_rotations, _timestamps);
+    }
+
+    if (_modelMatrices.size() > 0) {
+         //to generalize
+        glm::mat4 u_jointMat0 = _modelMatrices[0];
+        glm::mat4 u_jointMat1 = _modelMatrices[1];
+        std::vector<glm::mat4> test = {u_jointMat0, u_jointMat1};
+        if (_nodeTransformations[0] != -1) {
+            test[_nodeTransformations[0]] = glm::scale(test[_nodeTransformations[0]], scale);
+        }
+        if (_nodeTransformations[1] != -1) {
+            test[_nodeTransformations[1]] = quatToRotationMatrix(rotation) * test[_nodeTransformations[1]];
+        }
+        if (_nodeTransformations[2] != -1) {
+            test[_nodeTransformations[2]] = glm::translate(test[_nodeTransformations[2]], translation);
+        }
+            
+        u_jointMat0 = _inverseMatrices[0] * test[0];
+        u_jointMat1 = _inverseMatrices[1] * test[1];
+
+        _material->set_uniform(HASH("u_jointMat0"), u_jointMat0);
+        _material->set_uniform(HASH("u_jointMat1"), u_jointMat1);
+
+        _material->set_uniform(HASH("model"), transform());
+    }
+    else {
+        _material->set_uniform(HASH("model"), glm::translate(glm::scale(quatToRotationMatrix(rotation) * transform(), scale), translation));
+    }
+    
     _material->bind();
 
-    /*if (testPlane(_mesh, frustum._near_normal, frustum._point) &&
-        testPlane(_mesh, frustum._top_normal, frustum._point) &&
-        testPlane(_mesh, frustum._bottom_normal, frustum._point) &&
-        testPlane(_mesh, frustum._right_normal, frustum._point) &&
-        testPlane(_mesh, frustum._left_normal, frustum._point)
-        )*/ {
-        _mesh->draw();
-    }
+    _mesh->draw();
     
 }
 

@@ -20,10 +20,16 @@ class SceneObject {
         void render(Frustum frustum) const;
 
         void set_transform(const glm::mat4& tr);
-        void add_transform(const glm::vec4& tr);
+        void add_translation(glm::vec3 tr);
         const glm::mat4& transform() const;
+        std::vector<std::vector<double>> _scales;
+        std::vector<std::vector<double>> _translations;
         std::vector<std::vector<double>> _rotations;
+        std::vector<glm::mat4> _modelMatrices;
+        std::vector<glm::mat4> _inverseMatrices;
+        std::vector<int> _nodeTransformations = {-1,-1,-1};
         std::vector<double> _timestamps;
+        
 
     private:
         glm::mat4 _transform = glm::mat4(1.0f);
