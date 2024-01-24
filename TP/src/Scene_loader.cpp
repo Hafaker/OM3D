@@ -411,10 +411,6 @@ void manageAnimation(tinygltf::Model gltf, OM3D::SceneObject& scene_object) {
 
             DataVariant dataExtracted = dataExtraction(gltf, transformAccessor);
 
-            scene_object._rotations = std::get<std::vector<std::vector<double>>>(dataExtracted);
-            scene_object._translations = std::get<std::vector<std::vector<double>>>(dataExtracted);
-            scene_object._scales =  std::get<std::vector<std::vector<double>>>(dataExtracted);
-            
             if (gltf.skins.size() > 0) {
                 for (int i = 0; i < scene_object._modelMatrices.size(); i++) {
                     if (scene_object._modelMatrices[i]._node == channel.target_node) {
@@ -430,6 +426,17 @@ void manageAnimation(tinygltf::Model gltf, OM3D::SceneObject& scene_object) {
                     }
                 }
             }
+            else {
+                if (channel.target_path == "rotation") {
+                    scene_object._rotations = std::get<std::vector<std::vector<double>>>(dataExtracted);
+                }
+                else if (channel.target_path == "translation") {
+                    scene_object._translations = std::get<std::vector<std::vector<double>>>(dataExtracted);
+                }
+                else if (channel.target_path == "scale") {
+                    scene_object._scales = std::get<std::vector<std::vector<double>>>(dataExtracted);
+                }
+            }
         }
     }    
 }
@@ -443,11 +450,11 @@ glm::mat4 quaternionToRotationMatrix(glm::vec4 q) {
     );
 }
 
-glm::mat4 manageSkinNode(tinygltf::Model gltf, int node_i, glm::mat4 model, OM3D::SceneObject& scene_object) {
+void manageSkinNode(tinygltf::Model gltf, int node_i, glm::mat4 model, OM3D::SceneObject& scene_object) {
     tinygltf::Node node = gltf.nodes[node_i];
 
     //Apply the matrix linked to the node
-    if (node.matrix.size() > 0 ) {
+    if (node.matrix.size() > 0) {
         std::vector<double> vect_mat = node.matrix;
         glm::mat4 mat;
         mat[0] = glm::vec4(vect_mat[0], vect_mat[1], vect_mat[2], vect_mat[3]);
@@ -459,19 +466,22 @@ glm::mat4 manageSkinNode(tinygltf::Model gltf, int node_i, glm::mat4 model, OM3D
     }
 
     //Apply individual transformations instead if there are some
-    /*if (node.translation.size() > 0) {
+    if (node.scale.size() == 3) {
+        glm::vec3 scale = glm::vec3(node.scale[0], node.scale[1], node.scale[2]);
+        model = glm::scale(model, scale);
+    }
+
+    if (node.rotation.size() == 4) {
+        glm::vec4 rotation = glm::vec4(node.rotation[0], node.rotation[1], node.rotation[2], node.rotation[3]);
+        rotation = glm::normalize(rotation);
+        model = quaternionToRotationMatrix(rotation) * model;
+    }
+    
+    if (node.translation.size() == 3) {
         glm::vec3 translation = glm::vec3(node.translation[0], node.translation[1], node.translation[2]);
         model = glm::translate(model, translation);
     }
-    if (node.rotation.size() > 0) {
-        glm::vec4 rotation = glm::vec4(node.rotation[0], node.rotation[1], node.rotation[2], node.rotation[3]);
-        model = quaternionToRotationMatrix(rotation) * model;
-    }
-
-    if (node.scale.size() > 0) {
-        glm::vec3 scale = glm::vec3(node.scale[0], node.scale[1], node.scale[2]);
-        model = glm::scale(model, scale);
-    }*/
+    
 
     //Fillful the vector of modelMatrices if we are on a joint
     for (int joint_i = 0; joint_i < gltf.skins[0].joints.size(); joint_i++) {
@@ -487,7 +497,6 @@ glm::mat4 manageSkinNode(tinygltf::Model gltf, int node_i, glm::mat4 model, OM3D
         manageSkinNode(gltf, node.children[i], model, scene_object);
         i++;
     }
-    return model;
 }
 
 void manageSkin(tinygltf::Model gltf, OM3D::SceneObject& scene_object) {
@@ -507,8 +516,6 @@ void manageSkin(tinygltf::Model gltf, OM3D::SceneObject& scene_object) {
 
     size_t byteOffset = matricesBufferView.byteOffset + matricesAccessor.byteOffset;
     const float* data = reinterpret_cast<const float*>(&bufferData[byteOffset]);
-
-    size_t nbjoints = gltf.skins[0].joints.size();
 
     std::vector<glm::mat4> inverseMatrices;
 

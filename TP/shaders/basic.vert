@@ -54,8 +54,8 @@ void main() {
     out_color = in_color;
     out_position = position.xyz;
 
-    mat4 u_jointMat[19] = {u_jointMat0, u_jointMat1, u_jointMat2, u_jointMat3, u_jointMat4,
-                           u_jointMat5, u_jointMat6, u_jointMat7, u_jointMat8, u_jointMat9,
+    mat4 u_jointMat[19] = {u_jointMat0,  u_jointMat1,  u_jointMat2,  u_jointMat3, u_jointMat4,
+                           u_jointMat5,  u_jointMat6,  u_jointMat7,  u_jointMat8, u_jointMat9,
                            u_jointMat10, u_jointMat11, u_jointMat12, u_jointMat13, u_jointMat14,
                            u_jointMat15, u_jointMat16, u_jointMat17, u_jointMat18};
 

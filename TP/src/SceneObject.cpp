@@ -134,13 +134,13 @@ void SceneObject::render(Frustum frustum) const {
         glm::vec4 rotation = glm::vec4(0.0);
 
         if (_scales.size() > 0) {
-            glm::vec3 scale = interpolateTransformation(_scales, _timestamps, timeIndexes, time);
+            scale = interpolateTransformation(_scales, _timestamps, timeIndexes, time);
         }
         if (_translations.size() > 0) {
-            glm::vec3 translation = interpolateTransformation(_translations, _timestamps, timeIndexes, time);
+            translation = interpolateTransformation(_translations, _timestamps, timeIndexes, time);
         }
         if (_rotations.size() > 0) {
-            glm::vec4 rotation = interpolateRotation(_rotations, _timestamps);
+            rotation = interpolateRotation(_rotations, _timestamps);
         }
         _material->set_uniform(HASH("model"), glm::translate(glm::scale(quatToRotationMatrix(rotation) * transform(), scale), translation));
     }
