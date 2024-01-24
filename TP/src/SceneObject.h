@@ -44,12 +44,13 @@ class SceneObject {
         std::vector<double> _timestamps;
         
 
-    private:
         glm::mat4 _transform = glm::mat4(1.0f);
 
         std::shared_ptr<StaticMesh> _mesh;
         std::shared_ptr<Material> _material;
 };
+
+
 
 }
 

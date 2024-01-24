@@ -2,6 +2,7 @@
 #define SCENE_H
 
 #include <SceneObject.h>
+#include <BVH.h>
 #include <PointLight.h>
 #include <Camera.h>
 
@@ -19,6 +20,8 @@ class Scene : NonMovable {
 
         void render() const;
 
+        void init_bvh();
+
         void add_object(SceneObject obj);
         void add_light(PointLight obj);
 
@@ -33,8 +36,10 @@ class Scene : NonMovable {
         const glm::vec3 get_sun_col();
 
     private:
+        
         std::vector<SceneObject> _objects;
         std::vector<PointLight> _point_lights;
+        std::shared_ptr<BVH> _bvh;
 
         glm::vec3 _sun_direction;
         glm::vec3 _sun_color;
