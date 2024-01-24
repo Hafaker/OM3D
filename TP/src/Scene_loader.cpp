@@ -6,6 +6,8 @@
 #include <utils.h>
 
 #include <iostream>
+#include <variant>
+#include <cmath>
 
 #define TINYGLTF_IMPLEMENTATION
 #define TINYGLTF_NO_STB_IMAGE_WRITE
@@ -15,6 +17,8 @@
 namespace OM3D {
 
 bool display_gltf_loading_warnings = false;
+
+using DataVariant = std::variant<std::vector<double>, std::vector<std::vector<double>>>;
 
 static size_t component_count(int type) {
     switch(type) {
@@ -31,8 +35,8 @@ static size_t component_count(int type) {
 
 static bool decode_attrib_buffer(const tinygltf::Model& gltf, const std::string& name, const tinygltf::Accessor& accessor, Span<Vertex> vertices) {
     const tinygltf::BufferView& buffer = gltf.bufferViews[accessor.bufferView];
-
-    if(accessor.componentType != TINYGLTF_COMPONENT_TYPE_FLOAT) {
+    
+    if(accessor.componentType != TINYGLTF_COMPONENT_TYPE_FLOAT && name != "JOINTS_0") {
         if(display_gltf_loading_warnings) {
             std::cerr << "Unsupported component type (" << accessor.componentType << ") for \"" << name << "\"" << std::endl;
         }
@@ -93,6 +97,58 @@ static bool decode_attrib_buffer(const tinygltf::Model& gltf, const std::string&
         }
     };
 
+    auto decode_joints =  [&](auto* vertex_elems) {
+        using attrib_type = std::remove_reference_t<decltype(vertex_elems[0])>;
+        using value_type = uint16_t;
+        static constexpr size_t size = sizeof(attrib_type) / sizeof(value_type);
+
+        const size_t components = component_count(accessor.type);
+        const bool normalize = accessor.normalized;
+
+        DEBUG_ASSERT(accessor.count == vertex_count);
+
+        if(components != size) {
+            if(display_gltf_loading_warnings) {
+                std::cerr << "Expected VEC" << size << " attribute, got VEC" << components << std::endl;
+            }
+        }
+
+        const size_t min_size = std::min(size, components);
+        auto convert = [=](const u8* data) {
+            attrib_type vec;
+            for(size_t i = 0; i != min_size; ++i) {
+                vec[int(i)] = reinterpret_cast<const value_type*>(data)[i];
+            }
+            if(normalize) {
+                if constexpr(size == 4) {
+                    const glm::vec3 n = glm::normalize(glm::vec3(vec));
+                    vec[0] = n[0];
+                    vec[1] = n[1];
+                    vec[2] = n[2];
+                } else {
+                    vec = glm::normalize(vec);
+                }
+            }
+            return vec;
+        };
+
+        {
+            u8* out_begin = reinterpret_cast<u8*>(vertex_elems);
+
+            const auto& in_buffer = gltf.buffers[buffer.buffer].data;
+            const u8* in_begin = in_buffer.data() + buffer.byteOffset + accessor.byteOffset;
+            const size_t attrib_size = components * sizeof(value_type);
+            const size_t input_stride = buffer.byteStride ? buffer.byteStride : attrib_size;
+
+            for(size_t i = 0; i != accessor.count; ++i) {
+                const u8* attrib = in_begin + i * input_stride;
+                DEBUG_ASSERT(attrib < in_buffer.data() + in_buffer.size());
+                *reinterpret_cast<attrib_type*>(out_begin + i * sizeof(Vertex)) = convert(attrib);
+            }
+        }
+    };
+
+
     if(name == "POSITION") {
         decode_attribs(&vertices[0].position);
     } else if(name == "NORMAL") {
@@ -103,7 +159,12 @@ static bool decode_attrib_buffer(const tinygltf::Model& gltf, const std::string&
         decode_attribs(&vertices[0].uv);
     } else if(name == "COLOR_0") {
         decode_attribs(&vertices[0].color);
-    } else {
+    } else if(name == "WEIGHTS_0") {
+        decode_attribs(&vertices[0].a_weight);
+    } else if(name == "JOINTS_0") {
+        decode_joints(&vertices[0].a_joint);
+    }
+    else {
         if(display_gltf_loading_warnings) {
             std::cerr << "Attribute \"" << name << "\" is not supported" << std::endl;
         }
@@ -188,7 +249,15 @@ static Result<MeshData> build_mesh_data(const tinygltf::Model& gltf, const tinyg
             return {false, {}};
         }
     }
+    /*std::cout << "JOINTS" << std::endl;
+    for (auto vert : vertices) {
+        std::cout << vert.a_joint.x << " " <<  vert.a_joint.y << " "  << vert.a_joint.z << " " <<  vert.a_joint.w << std::endl;
+    }
+    std::cout << std::endl << "WEIGHTS" << std::endl;
 
+    for (auto vert : vertices) {
+        std::cout << vert.a_weight.x << " " <<  vert.a_weight.y << " "  << vert.a_weight.z << " " <<  vert.a_weight.w << std::endl;
+    }*/
     return {true, MeshData{std::move(vertices), std::move(indices)}};
 }
 
@@ -293,6 +362,178 @@ static void compute_tangents(MeshData& mesh) {
     }
 }
 
+DataVariant dataExtraction(tinygltf::Model gltf, tinygltf::Accessor accessor) {
+    tinygltf::BufferView BufferView = gltf.bufferViews[accessor.bufferView];
+    
+    tinygltf::Buffer buffer = gltf.buffers[BufferView.buffer];
+    const unsigned char* bufferData = buffer.data.data();
+    size_t byteOffset = BufferView.byteOffset + accessor.byteOffset;
+
+    // ASSUMING IT IS FLOAT (5126)
+    const float* data = reinterpret_cast<const float*>(&bufferData[byteOffset]);
+
+    if (accessor.type == TINYGLTF_TYPE_SCALAR) {
+        std::vector<double> dataExtracted;
+        for (size_t i = 0; i < accessor.count; i++) {
+            dataExtracted.push_back(static_cast<double>(data[i]));
+        }
+        return dataExtracted;
+    }
+
+    else if (accessor.type == TINYGLTF_TYPE_VEC3 || accessor.type == TINYGLTF_TYPE_VEC4) {
+        std::vector<std::vector<double>> dataExtracted;
+        for (size_t i = 0; i < accessor.count * accessor.type; i += accessor.type) {
+            std::vector<double> vec;
+            for (size_t j = 0; j < 4; j++) {
+                vec.push_back(static_cast<double>(data[i + j]));
+            }
+            dataExtracted.push_back(vec);
+        }
+        return dataExtracted;
+    }
+    else
+        return std::vector<double>();
+}
+
+void manageAnimation(tinygltf::Model gltf, OM3D::SceneObject& scene_object) {
+    for (tinygltf::Animation animation : gltf.animations) {
+        for (tinygltf::AnimationChannel channel : animation.channels) {
+            int sampler = channel.sampler;
+
+            // Times Data Extraction
+            if (scene_object._timestamps.size() == 0) {
+                tinygltf::Accessor timesAccessor = gltf.accessors[animation.samplers[sampler].input];
+                scene_object._timestamps = std::get<std::vector<double>>(dataExtraction(gltf, timesAccessor));
+            }
+            
+            // Transform Data Extraction
+            tinygltf::Accessor transformAccessor = gltf.accessors[animation.samplers[sampler].output];
+
+            DataVariant dataExtracted = dataExtraction(gltf, transformAccessor);
+
+            if (gltf.skins.size() > 0) {
+                for (int i = 0; i < scene_object._modelMatrices.size(); i++) {
+                    if (scene_object._modelMatrices[i]._node == channel.target_node) {
+                        if (channel.target_path == "rotation") {
+                            scene_object._modelMatrices[i]._rotations = std::get<std::vector<std::vector<double>>>(dataExtracted);
+                        }
+                        else if (channel.target_path == "translation") {
+                            scene_object._modelMatrices[i]._translations = std::get<std::vector<std::vector<double>>>(dataExtracted);
+                        }
+                        else if (channel.target_path == "scale") {
+                            scene_object._modelMatrices[i]._scales = std::get<std::vector<std::vector<double>>>(dataExtracted);
+                        }
+                    }
+                }
+            }
+            else {
+                if (channel.target_path == "rotation") {
+                    scene_object._rotations = std::get<std::vector<std::vector<double>>>(dataExtracted);
+                }
+                else if (channel.target_path == "translation") {
+                    scene_object._translations = std::get<std::vector<std::vector<double>>>(dataExtracted);
+                }
+                else if (channel.target_path == "scale") {
+                    scene_object._scales = std::get<std::vector<std::vector<double>>>(dataExtracted);
+                }
+            }
+        }
+    }    
+}
+
+glm::mat4 quaternionToRotationMatrix(glm::vec4 q) {
+    return glm::mat4(
+        1.0 - 2.0 * (q.y * q.y + q.z * q.z), 2.0 * (q.x * q.y - q.w * q.z), 2.0 * (q.x * q.z + q.w * q.y), 0.0,
+        2.0 * (q.x * q.y + q.w * q.z), 1.0 - 2.0 * (q.x * q.x + q.z * q.z), 2.0 * (q.y * q.z - q.w * q.x), 0.0,
+        2.0 * (q.x * q.z - q.w * q.y), 2.0 * (q.y * q.z + q.w * q.x), 1.0 - 2.0 * (q.x * q.x + q.y * q.y), 0.0,
+        0.0, 0.0, 0.0, 1.0
+    );
+}
+
+void manageSkinNode(tinygltf::Model gltf, int node_i, glm::mat4 model, OM3D::SceneObject& scene_object) {
+    tinygltf::Node node = gltf.nodes[node_i];
+
+    //Apply the matrix linked to the node
+    if (node.matrix.size() > 0) {
+        std::vector<double> vect_mat = node.matrix;
+        glm::mat4 mat;
+        mat[0] = glm::vec4(vect_mat[0], vect_mat[1], vect_mat[2], vect_mat[3]);
+        mat[1] = glm::vec4(vect_mat[4], vect_mat[5], vect_mat[6], vect_mat[7]);
+        mat[2] = glm::vec4(vect_mat[8], vect_mat[9], vect_mat[10], vect_mat[11]);
+        mat[3] = glm::vec4(vect_mat[12], vect_mat[13], vect_mat[14], vect_mat[15]);
+
+        model *= mat;
+    }
+
+    //Apply individual transformations instead if there are some
+    if (node.scale.size() == 3) {
+        glm::vec3 scale = glm::vec3(node.scale[0], node.scale[1], node.scale[2]);
+        model = glm::scale(model, scale);
+    }
+
+    if (node.rotation.size() == 4) {
+        glm::vec4 rotation = glm::vec4(node.rotation[0], node.rotation[1], node.rotation[2], node.rotation[3]);
+        rotation = glm::normalize(rotation);
+        model = quaternionToRotationMatrix(rotation) * model;
+    }
+    
+    if (node.translation.size() == 3) {
+        glm::vec3 translation = glm::vec3(node.translation[0], node.translation[1], node.translation[2]);
+        model = glm::translate(model, translation);
+    }
+    
+
+    //Fillful the vector of modelMatrices if we are on a joint
+    for (int joint_i = 0; joint_i < gltf.skins[0].joints.size(); joint_i++) {
+        if (node_i == gltf.skins[0].joints[joint_i]) {
+            scene_object._modelMatrices[joint_i] = modelMatrix(model, node_i);
+            break;
+        }
+    }
+
+    int i = 0;
+    //Iterate trought children to build their modele matrices
+    while (i < node.children.size()) { 
+        manageSkinNode(gltf, node.children[i], model, scene_object);
+        i++;
+    }
+}
+
+void manageSkin(tinygltf::Model gltf, OM3D::SceneObject& scene_object) {
+    
+    std::vector<modelMatrix> initVector(gltf.skins[0].joints.size(), modelMatrix(glm::mat4(1.0), 0));
+    scene_object._modelMatrices = initVector;
+
+    manageSkinNode(gltf, 0, glm::mat4(1.0), scene_object);
+    
+
+    //Get all the inverseMatrices
+    const tinygltf::Accessor matricesAccessor = gltf.accessors[gltf.skins[0].inverseBindMatrices];
+    const tinygltf::BufferView matricesBufferView = gltf.bufferViews[matricesAccessor.bufferView];
+
+    const tinygltf::Buffer buffer = gltf.buffers[matricesBufferView.buffer];
+    const unsigned char* bufferData = buffer.data.data();
+
+    size_t byteOffset = matricesBufferView.byteOffset + matricesAccessor.byteOffset;
+    const float* data = reinterpret_cast<const float*>(&bufferData[byteOffset]);
+
+    std::vector<glm::mat4> inverseMatrices;
+
+    for (int mat_i = 0; mat_i < matricesAccessor.count; ++mat_i) {
+
+        glm::mat4 jointMat;
+        for (int i = 0; i < 4; ++i) {
+            glm::vec4 row;
+            for (int j = 0; j < 4; ++j) {
+                float value = data[mat_i * 16 + i * 4 + j];
+                row[j] = value;
+            }
+            jointMat[i] = row;
+        }
+        inverseMatrices.push_back(jointMat);
+    }
+    scene_object._inverseMatrices = inverseMatrices;
+}
 
 Result<std::unique_ptr<Scene>> Scene::from_gltf(const std::string& file_name) {
     const double time = program_time();
@@ -435,6 +676,17 @@ Result<std::unique_ptr<Scene>> Scene::from_gltf(const std::string& file_name) {
 
             auto scene_object = SceneObject(std::make_shared<StaticMesh>(mesh.value), std::move(material));
             scene_object.set_transform(node_transform);
+
+            if (gltf.skins.size() > 0) {
+                manageSkin(gltf, scene_object);
+            }
+            
+            if (gltf.animations.size() > 0) {
+                manageAnimation(gltf, scene_object);
+            }
+                
+            
+
             scene->add_object(std::move(scene_object));
         }
     }
@@ -455,7 +707,6 @@ Result<std::unique_ptr<Scene>> Scene::from_gltf(const std::string& file_name) {
         }
         scene->add_light(light);
     }
-
 
     return {true, std::move(scene)};
 }

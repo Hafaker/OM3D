@@ -46,17 +46,23 @@ void StaticMesh::draw() const {
     // Vertex color
     glVertexAttribPointer(4, 3, GL_FLOAT, false, sizeof(Vertex), reinterpret_cast<void*>(12 * sizeof(float)));
 
+    // Joint
+    glVertexAttribPointer(5, 4, GL_FLOAT, false, sizeof(Vertex), reinterpret_cast<void*>(15 * sizeof(float)));
+    // Weight
+    glVertexAttribPointer(6, 4, GL_FLOAT, false, sizeof(Vertex), reinterpret_cast<void*>(19 * sizeof(float)));
+
     glEnableVertexAttribArray(0);
     glEnableVertexAttribArray(1);
     glEnableVertexAttribArray(2);
     glEnableVertexAttribArray(3);
     glEnableVertexAttribArray(4);
+    glEnableVertexAttribArray(5);
+    glEnableVertexAttribArray(6);
 
     if(audit_bindings_before_draw) {
         audit_bindings();
     }
 
-    // Test the bounding box with the frustum before drawing
     glDrawElements(GL_TRIANGLES, int(_index_buffer.element_count()), GL_UNSIGNED_INT, nullptr);
 }
 
