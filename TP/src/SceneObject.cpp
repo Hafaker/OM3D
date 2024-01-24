@@ -105,44 +105,43 @@ void SceneObject::render(Frustum frustum) const {
     double time = fmod(program_time(), 2.0);
     std::vector<size_t> timeIndexes = findSurroundingTimestamps(time, _timestamps);
 
-    glm::vec3 scale = glm::vec3(1.0);
-    if (_scales.size() > 0) {
-        scale = interpolateTransformation(_scales, _timestamps, timeIndexes, time);
-    }
-
-    glm::vec3 translation = glm::vec3(0.0);
-    if (_translations.size() > 0) {
-        translation = interpolateTransformation(_translations, _timestamps, timeIndexes, time);
-    }
-    glm::vec4 rotation = glm::vec4(0.0);
-    if (_rotations.size() > 0) {
-        rotation = interpolateRotation(_rotations, _timestamps);
-    }
 
     if (_modelMatrices.size() > 0) {
-         //to generalize
-        glm::mat4 u_jointMat0 = _modelMatrices[0];
-        glm::mat4 u_jointMat1 = _modelMatrices[1];
-        std::vector<glm::mat4> test = {u_jointMat0, u_jointMat1};
-        if (_nodeTransformations[0] != -1) {
-            test[_nodeTransformations[0]] = glm::scale(test[_nodeTransformations[0]], scale);
-        }
-        if (_nodeTransformations[1] != -1) {
-            test[_nodeTransformations[1]] = quatToRotationMatrix(rotation) * test[_nodeTransformations[1]];
-        }
-        if (_nodeTransformations[2] != -1) {
-            test[_nodeTransformations[2]] = glm::translate(test[_nodeTransformations[2]], translation);
-        }
-            
-        u_jointMat0 = _inverseMatrices[0] * test[0];
-        u_jointMat1 = _inverseMatrices[1] * test[1];
+        for (int i = 0; i < _modelMatrices.size(); i++) {
+            glm::mat4 u_jointMat_i = _modelMatrices[i]._mat;
+            if (_modelMatrices[i]._translations.size() > 0) {
+                glm::vec3 translation = interpolateTransformation(_modelMatrices[i]._translations, _timestamps, timeIndexes, time);
+                u_jointMat_i = glm::translate(u_jointMat_i, translation);
+            }
+            if (_modelMatrices[i]._rotations.size() > 0) {
+                glm::vec4 rotation = interpolateRotation(_modelMatrices[i]._rotations, _timestamps);
+                u_jointMat_i = quatToRotationMatrix(rotation) * u_jointMat_i;
+            }
+            if (_modelMatrices[i]._scales.size() > 0) {
+                glm::vec3 scale = interpolateTransformation(_modelMatrices[i]._scales, _timestamps, timeIndexes, time);
+                u_jointMat_i = glm::scale(u_jointMat_i, scale);
+            }
 
-        _material->set_uniform(HASH("u_jointMat0"), u_jointMat0);
-        _material->set_uniform(HASH("u_jointMat1"), u_jointMat1);
-
+            u_jointMat_i =  u_jointMat_i * _inverseMatrices[i];
+            std::string uniformName= "u_jointMat" + std::to_string(i);
+            _material->set_uniform(str_hash(uniformName), u_jointMat_i);
+        }
         _material->set_uniform(HASH("model"), transform());
     }
     else {
+        glm::vec3 scale = glm::vec3(1.0);
+        glm::vec3 translation = glm::vec3(0.0);
+        glm::vec4 rotation = glm::vec4(0.0);
+
+        if (_scales.size() > 0) {
+            glm::vec3 scale = interpolateTransformation(_scales, _timestamps, timeIndexes, time);
+        }
+        if (_translations.size() > 0) {
+            glm::vec3 translation = interpolateTransformation(_translations, _timestamps, timeIndexes, time);
+        }
+        if (_rotations.size() > 0) {
+            glm::vec4 rotation = interpolateRotation(_rotations, _timestamps);
+        }
         _material->set_uniform(HASH("model"), glm::translate(glm::scale(quatToRotationMatrix(rotation) * transform(), scale), translation));
     }
     

@@ -410,15 +410,25 @@ void manageAnimation(tinygltf::Model gltf, OM3D::SceneObject& scene_object) {
             tinygltf::Accessor transformAccessor = gltf.accessors[animation.samplers[sampler].output];
 
             DataVariant dataExtracted = dataExtraction(gltf, transformAccessor);
-            if (channel.target_path == "rotation") {
-                scene_object._rotations = std::get<std::vector<std::vector<double>>>(dataExtracted);
-            }
-            else if (channel.target_path == "translation") {
-                scene_object._translations = std::get<std::vector<std::vector<double>>>(dataExtracted);
-            }
 
-            else if (channel.target_path == "scale") {
-                scene_object._scales = std::get<std::vector<std::vector<double>>>(dataExtracted);
+            scene_object._rotations = std::get<std::vector<std::vector<double>>>(dataExtracted);
+            scene_object._translations = std::get<std::vector<std::vector<double>>>(dataExtracted);
+            scene_object._scales =  std::get<std::vector<std::vector<double>>>(dataExtracted);
+            
+            if (gltf.skins.size() > 0) {
+                for (int i = 0; i < scene_object._modelMatrices.size(); i++) {
+                    if (scene_object._modelMatrices[i]._node == channel.target_node) {
+                        if (channel.target_path == "rotation") {
+                            scene_object._modelMatrices[i]._rotations = std::get<std::vector<std::vector<double>>>(dataExtracted);
+                        }
+                        else if (channel.target_path == "translation") {
+                            scene_object._modelMatrices[i]._translations = std::get<std::vector<std::vector<double>>>(dataExtracted);
+                        }
+                        else if (channel.target_path == "scale") {
+                            scene_object._modelMatrices[i]._scales = std::get<std::vector<std::vector<double>>>(dataExtracted);
+                        }
+                    }
+                }
             }
         }
     }    
@@ -433,50 +443,62 @@ glm::mat4 quaternionToRotationMatrix(glm::vec4 q) {
     );
 }
 
-void manageSkin(tinygltf::Model gltf, OM3D::SceneObject& scene_object) {
+glm::mat4 manageSkinNode(tinygltf::Model gltf, int node_i, glm::mat4 model, OM3D::SceneObject& scene_object) {
+    tinygltf::Node node = gltf.nodes[node_i];
 
-    std::vector<glm::mat4> modelMatrices;
-    glm::mat4 model = glm::mat4(1.0);
+    //Apply the matrix linked to the node
+    if (node.matrix.size() > 0 ) {
+        std::vector<double> vect_mat = node.matrix;
+        glm::mat4 mat;
+        mat[0] = glm::vec4(vect_mat[0], vect_mat[1], vect_mat[2], vect_mat[3]);
+        mat[1] = glm::vec4(vect_mat[4], vect_mat[5], vect_mat[6], vect_mat[7]);
+        mat[2] = glm::vec4(vect_mat[8], vect_mat[9], vect_mat[10], vect_mat[11]);
+        mat[3] = glm::vec4(vect_mat[12], vect_mat[13], vect_mat[14], vect_mat[15]);
 
-    std::vector<glm::mat4> matrices;
-    glm::vec4 rotation = glm::vec4(0.0);
-    glm::vec3 translation = glm::vec3(0.0);
-    glm::vec3 scale = glm::vec3(1.0);
+        model *= mat;
+    }
 
-    //Global transformation
-    for (int node_i = 0; node_i < gltf.skins[0].joints.size(); node_i++) {
-        std::cout << node_i << std::endl;
-        tinygltf::Node node = gltf.nodes[node_i];
+    //Apply individual transformations instead if there are some
+    /*if (node.translation.size() > 0) {
+        glm::vec3 translation = glm::vec3(node.translation[0], node.translation[1], node.translation[2]);
+        model = glm::translate(model, translation);
+    }
+    if (node.rotation.size() > 0) {
+        glm::vec4 rotation = glm::vec4(node.rotation[0], node.rotation[1], node.rotation[2], node.rotation[3]);
+        model = quaternionToRotationMatrix(rotation) * model;
+    }
 
-        if (node.matrix.size() > 0 ) {
-            std::vector<double> vect_mat = node.matrix;
-            glm::mat4 mat;
-            mat[0] = glm::vec4(vect_mat[0], vect_mat[1], vect_mat[2], vect_mat[3]);
-            mat[1] = glm::vec4(vect_mat[4], vect_mat[5], vect_mat[6], vect_mat[7]);
-            mat[2] = glm::vec4(vect_mat[8], vect_mat[9], vect_mat[10], vect_mat[11]);
-            mat[3] = glm::vec4(vect_mat[12], vect_mat[13], vect_mat[14], vect_mat[15]);
+    if (node.scale.size() > 0) {
+        glm::vec3 scale = glm::vec3(node.scale[0], node.scale[1], node.scale[2]);
+        model = glm::scale(model, scale);
+    }*/
 
-            model *= mat;
-        }
-        if (node.rotation.size() > 0) {
-            rotation = glm::vec4(node.rotation[0], node.rotation[1], node.rotation[2], node.rotation[3]);
-            model = model * quaternionToRotationMatrix(rotation);
-        }
-        if (node.translation.size() > 0) {
-            translation = glm::vec3(node.translation[0], node.translation[1], node.translation[2]);
-            model = glm::translate(model, translation);
-        }
-        for (int joint_i = 0; joint_i < gltf.skins[0].joints.size(); joint_i++) {
-            if (node_i == joint_i) {
-                modelMatrices.push_back(model);
-                break;
-            }
+    //Fillful the vector of modelMatrices if we are on a joint
+    for (int joint_i = 0; joint_i < gltf.skins[0].joints.size(); joint_i++) {
+        if (node_i == gltf.skins[0].joints[joint_i]) {
+            scene_object._modelMatrices[joint_i] = modelMatrix(model, node_i);
+            break;
         }
     }
 
-    scene_object._modelMatrices = modelMatrices;
+    int i = 0;
+    //Iterate trought children to build their modele matrices
+    while (i < node.children.size()) { 
+        manageSkinNode(gltf, node.children[i], model, scene_object);
+        i++;
+    }
+    return model;
+}
+
+void manageSkin(tinygltf::Model gltf, OM3D::SceneObject& scene_object) {
+    
+    std::vector<modelMatrix> initVector(gltf.skins[0].joints.size(), modelMatrix(glm::mat4(1.0), 0));
+    scene_object._modelMatrices = initVector;
+
+    manageSkinNode(gltf, 0, glm::mat4(1.0), scene_object);
     
 
+    //Get all the inverseMatrices
     const tinygltf::Accessor matricesAccessor = gltf.accessors[gltf.skins[0].inverseBindMatrices];
     const tinygltf::BufferView matricesBufferView = gltf.bufferViews[matricesAccessor.bufferView];
 
@@ -484,10 +506,8 @@ void manageSkin(tinygltf::Model gltf, OM3D::SceneObject& scene_object) {
     const unsigned char* bufferData = buffer.data.data();
 
     size_t byteOffset = matricesBufferView.byteOffset + matricesAccessor.byteOffset;
-
     const float* data = reinterpret_cast<const float*>(&bufferData[byteOffset]);
 
-    // Simplified
     size_t nbjoints = gltf.skins[0].joints.size();
 
     std::vector<glm::mat4> inverseMatrices;
@@ -506,19 +526,6 @@ void manageSkin(tinygltf::Model gltf, OM3D::SceneObject& scene_object) {
         inverseMatrices.push_back(jointMat);
     }
     scene_object._inverseMatrices = inverseMatrices;
-
-    for (tinygltf::AnimationChannel channel : gltf.animations[0].channels) {
-        for (int i = 0; i < gltf.skins[0].joints.size(); i++) {
-            if (gltf.skins[0].joints[i] == channel.target_node) {
-                if (channel.target_path == "scale")
-                    scene_object._nodeTransformations[0] = i;
-                else if (channel.target_path == "rotation")
-                    scene_object._nodeTransformations[1] = i;
-                else if (channel.target_path == "translation")
-                    scene_object._nodeTransformations[2] = i;
-            }
-        }
-    }
 }
 
 Result<std::unique_ptr<Scene>> Scene::from_gltf(const std::string& file_name) {
@@ -663,13 +670,15 @@ Result<std::unique_ptr<Scene>> Scene::from_gltf(const std::string& file_name) {
             auto scene_object = SceneObject(std::make_shared<StaticMesh>(mesh.value), std::move(material));
             scene_object.set_transform(node_transform);
 
+            if (gltf.skins.size() > 0) {
+                manageSkin(gltf, scene_object);
+            }
+            
             if (gltf.animations.size() > 0) {
                 manageAnimation(gltf, scene_object);
             }
                 
-            if (gltf.skins.size() > 0) {
-                manageSkin(gltf, scene_object);
-            }
+            
 
             scene->add_object(std::move(scene_object));
         }

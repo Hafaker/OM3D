@@ -12,6 +12,20 @@
 
 namespace OM3D {
 
+class modelMatrix {
+    public:
+        
+        modelMatrix(glm::mat4 mat, int node_i) : 
+            _mat(mat),
+            _node(node_i) {
+        }
+        int _node;
+        glm::mat4 _mat;
+        std::vector<std::vector<double>> _translations;
+        std::vector<std::vector<double>> _rotations;
+        std::vector<std::vector<double>> _scales; 
+};
+
 class SceneObject {
 
     public:
@@ -25,9 +39,8 @@ class SceneObject {
         std::vector<std::vector<double>> _scales;
         std::vector<std::vector<double>> _translations;
         std::vector<std::vector<double>> _rotations;
-        std::vector<glm::mat4> _modelMatrices;
+        std::vector<modelMatrix> _modelMatrices;
         std::vector<glm::mat4> _inverseMatrices;
-        std::vector<int> _nodeTransformations = {-1,-1,-1};
         std::vector<double> _timestamps;
         
 
