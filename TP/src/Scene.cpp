@@ -9,6 +9,12 @@ namespace OM3D {
 Scene::Scene() {
 }
 
+void Scene::init_bvh()
+{
+    _bvh = std::make_shared<BVH>(BVH(_objects));
+    _bvh->split();
+}
+
 void Scene::add_object(SceneObject obj) {
     _objects.emplace_back(std::move(obj));
 }
@@ -76,10 +82,9 @@ void Scene::render() const {
 
     const Frustum frustum = _camera.build_frustum();
 
-    // Render every object
-    for(const SceneObject& obj : _objects) {
-        obj.render(frustum);
-    }
+    // Render visible object thanks to BVH
+    _bvh->render(frustum, _camera.position());
+
 }
 
 }

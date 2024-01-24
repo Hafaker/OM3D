@@ -227,7 +227,7 @@ std::unique_ptr<Scene> create_default_scene() {
     auto scene = std::make_unique<Scene>();
 
     // Load default cube model
-    auto result = Scene::from_gltf(std::string(resources_path) + "bistro.glb");
+    auto result = Scene::from_gltf(std::string(resources_path) + "forest.glb");
     ALWAYS_ASSERT(result.is_ok, "Unable to load default scene");
     scene = std::move(result.value);
 
@@ -248,7 +248,7 @@ std::unique_ptr<Scene> create_default_scene() {
         light.set_radius(50.0f);
         scene->add_light(std::move(light));
     }
-
+    scene->init_bvh();
     return scene;
 }
 

@@ -22,12 +22,13 @@ class SceneObject {
         void set_transform(const glm::mat4& tr);
         const glm::mat4& transform() const;
 
-    private:
         glm::mat4 _transform = glm::mat4(1.0f);
 
         std::shared_ptr<StaticMesh> _mesh;
         std::shared_ptr<Material> _material;
 };
+
+
 
 }
 
