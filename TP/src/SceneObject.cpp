@@ -10,6 +10,9 @@ SceneObject::SceneObject(std::shared_ptr<StaticMesh> mesh, std::shared_ptr<Mater
     _material(std::move(material)) {
 }
 
+bool testPlane(SphereBoundingBox bbox, glm::vec3 normal, glm::vec3 position) {
+    return glm::dot(normal, bbox.center) > glm::dot(normal, position) - bbox.radius;
+
 
 glm::mat4 quatToRotationMatrix(glm::vec4 q) {
     return glm::mat4(
