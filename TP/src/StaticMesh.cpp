@@ -23,7 +23,7 @@ StaticMesh::StaticMesh(const MeshData& data) :
     float max = 0.0;
     for (auto vert : data.vertices) {
         float n_dist = glm::distance(vert.position, center);
-        max = std::max(n_dist, max_dist);
+        max = std::max(n_dist, max);
     }
     float radius = max;
     _bbox.center = center;

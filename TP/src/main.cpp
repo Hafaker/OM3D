@@ -188,6 +188,15 @@ void gui(ImGuiRenderer& imgui) {
                 }
             }
         }
+        for (auto&& entry : std::filesystem::directory_iterator(resources_path)) {
+            if (entry.status().type() == std::filesystem::file_type::regular) {
+                const auto ext = entry.path().extension();
+                if (ext == ".gltf" || ext == ".glb") {
+                    scene_files.emplace_back(entry.path().string());
+                }
+            }
+        }
+
     }
 
     if(ImGui::BeginPopup("###openscenepopup", ImGuiWindowFlags_AlwaysAutoResize)) {
@@ -227,7 +236,7 @@ std::unique_ptr<Scene> create_default_scene() {
     auto scene = std::make_unique<Scene>();
 
     // Load default cube model
-    auto result = Scene::from_gltf(std::string(resources_path) + "forest.glb");
+    auto result = Scene::from_gltf(std::string(resources_path) + "bistro.glb");
     ALWAYS_ASSERT(result.is_ok, "Unable to load default scene");
     scene = std::move(result.value);
 
