@@ -466,7 +466,7 @@ void manageSkinNode(tinygltf::Model gltf, int node_i, glm::mat4 model, OM3D::Sce
     }
 
     //Apply individual transformations instead if there are some
-    if (node.scale.size() == 3) {
+    /*if (node.scale.size() == 3) {
         glm::vec3 scale = glm::vec3(node.scale[0], node.scale[1], node.scale[2]);
         model = glm::scale(model, scale);
     }
@@ -480,7 +480,7 @@ void manageSkinNode(tinygltf::Model gltf, int node_i, glm::mat4 model, OM3D::Sce
     if (node.translation.size() == 3) {
         glm::vec3 translation = glm::vec3(node.translation[0], node.translation[1], node.translation[2]);
         model = glm::translate(model, translation);
-    }
+    }*/
     
 
     //Fillful the vector of modelMatrices if we are on a joint

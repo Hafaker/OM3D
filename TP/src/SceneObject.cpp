@@ -10,7 +10,6 @@ SceneObject::SceneObject(std::shared_ptr<StaticMesh> mesh, std::shared_ptr<Mater
     _material(std::move(material)) {
 }
 
-
 glm::mat4 quatToRotationMatrix(glm::vec4 q) {
     return glm::mat4(
         1.0 - 2.0 * (q.y * q.y + q.z * q.z), 2.0 * (q.x * q.y - q.w * q.z), 2.0 * (q.x * q.z + q.w * q.y), 0.0,
@@ -98,12 +97,6 @@ glm::vec4 interpolateRotation(std::vector<std::vector<double>> rotations, std::v
 
 } 
 
-bool testPlane(SphereBoundingBox bbox, glm::vec3 normal, glm::vec3 position) {
-    return glm::dot(normal, bbox.center) > glm::dot(normal, position) - bbox.radius;
-}
-
-
-
 void SceneObject::render(Frustum frustum) const {
     if(!_material || !_mesh) {
         return;
@@ -140,7 +133,6 @@ void SceneObject::render(Frustum frustum) const {
         glm::vec3 translation = glm::vec3(0.0);
         glm::vec4 rotation = glm::vec4(0.0);
 
-
         if (_scales.size() > 0) {
             scale = interpolateTransformation(_scales, _timestamps, timeIndexes, time);
         }
@@ -157,7 +149,6 @@ void SceneObject::render(Frustum frustum) const {
 
     _mesh->draw();
     
-
 }
 
 void SceneObject::set_transform(const glm::mat4& tr) {

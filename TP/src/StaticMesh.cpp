@@ -15,17 +15,31 @@ StaticMesh::StaticMesh(const MeshData& data) :
     // Create a bounding sphere
 
     // Search the center of the sphere
-    glm::vec3 sum = glm::vec3(0.0);
-    for (auto i : data.vertices) {
-        sum += i.position;
+    glm::vec3 maxCorner = data.vertices[0].position;
+    glm::vec3 minCorner = data.vertices[0].position;
+
+    for (int i = 1; i < data.vertices.size(); ++i)
+    {
+        glm::vec3 vertex_pos = data.vertices[i].position;
+        if (vertex_pos.x > maxCorner.x)
+            maxCorner.x = vertex_pos.x;
+        else if (vertex_pos.x < minCorner.x)
+            minCorner.x = vertex_pos.x;
+
+        if (vertex_pos.y > maxCorner.y)
+            maxCorner.y = vertex_pos.y;
+        else if (vertex_pos.y < minCorner.y)
+            minCorner.y = vertex_pos.y;
+
+        if (vertex_pos.z > maxCorner.z)
+            maxCorner.z = vertex_pos.z;
+        else if (vertex_pos.z < minCorner.z)
+            minCorner.z = vertex_pos.z;
     }
-    glm::vec3 center = sum / (float)data.vertices.size();
-    float max = 0.0;
-    for (auto vert : data.vertices) {
-        float n_dist = glm::distance(vert.position, center);
-        max = std::max(n_dist, max);
-    }
-    float radius = max;
+
+    glm::vec3 center = (maxCorner + minCorner) / 2.0f;
+    float radius = std::max({abs(maxCorner.x - center.x), abs(maxCorner.y - center.y), abs(maxCorner.z - center.z)});
+
     _bbox.center = center;
     _bbox.radius = radius;
 
